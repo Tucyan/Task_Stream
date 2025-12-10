@@ -1,0 +1,51 @@
+# FastAPI核心框架
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# 数据库相关
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# 数据验证和序列化
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# 安全和认证
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# CORS支持
+python-cors==1.7.0
+
+# HTTP客户端（如果需要）
+httpx==0.25.2
+
+# 环境变量管理
+python-dotenv==1.0.0
+
+# 日志处理
+structlog==23.2.0
+
+# 日期时间处理
+python-dateutil==2.8.2
+
+# 数据库驱动（SQLite已内置，这里保留其他选项）
+# psycopg2-binary==2.9.9  # PostgreSQL
+# PyMySQL==1.1.0         # MySQL
+
+# 开发和测试工具
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# 代码质量工具
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
+
+# 性能监控
+psutil==5.9.6
+
+# JSON处理
+orjson==3.9.10
