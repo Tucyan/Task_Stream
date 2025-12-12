@@ -24,7 +24,7 @@ class RegisterRequest(BaseModel):
     passwordHash: str
     nickname: str = None  # 昵称字段，可选
 
-@router.post("/api/register")
+@router.post("/register")
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
     username = data.username
     passwordHash = data.passwordHash
@@ -52,7 +52,7 @@ class LoginRequest(BaseModel):
     username: str
     passwordHash: str
 
-@router.post("/api/login")
+@router.post("/login")
 def login(data: LoginRequest, db: Session = Depends(get_db)):
     username = data.username
     passwordHash = data.passwordHash
@@ -67,7 +67,7 @@ class UpdatePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
-@router.put("/api/update-password")
+@router.put("/password")
 def update_password(data: UpdatePasswordRequest, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.id == data.user_id).first()
     if not user:
@@ -87,7 +87,7 @@ class UpdateNicknameRequest(BaseModel):
     user_id: int
     new_nickname: str
 
-@router.put("/api/update-nickname")
+@router.put("/nickname")
 def update_nickname(data: UpdateNicknameRequest, db: Session = Depends(get_db)):
     print(f"[后端日志] 开始更新昵称")
     print(f"[后端日志] 请求数据: user_id={data.user_id}, new_nickname={data.new_nickname}")

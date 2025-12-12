@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import sha256 from 'js-sha256';
 
 /**
  * 通用 Fetch 请求封装
@@ -8,31 +9,37 @@ const API_BASE_URL = 'http://localhost:8000';
  */
 async function request(url, options = {}) {
     // 为昵称更新请求添加特殊标记
-    const isNicknameUpdate = url.includes('/api/update-nickname');
+    const isNicknameUpdate = url.includes('/api/v1/auth/nickname');
     // 为长期任务请求添加特殊标记
-    const isLongTermTaskRequest = url.includes('/long_term_tasks');
+    const isLongTermTaskRequest = url.includes('/long-term-tasks');
     
     if (isNicknameUpdate) {
-        console.log('[API请求] 开始昵称更新请求');
-        console.log('[API请求] 请求URL:', url);
-        console.log('[API请求] 请求方法:', options.method);
-        console.log('[API请求] 请求头:', options.headers);
-        console.log('[API请求] 请求体:', options.body);
-console.log('[API请求] 更新任务数据:', options.body);
-    } else if (isLongTermTaskRequest && options.body) {
-        console.log('[API请求] 长期任务请求');
-        console.log('[API请求] 请求URL:', url);
-        console.log('[API请求] 请求方法:', options.method);
-        try {
-            const bodyData = JSON.parse(options.body);
-            console.log('[API请求] sub_task_ids:', bodyData.sub_task_ids);
-            console.log('[API请求] sub_task_ids类型:', typeof bodyData.sub_task_ids);
-            console.log('[API请求] sub_task_ids字符串:', JSON.stringify(bodyData.sub_task_ids));
-        } catch (e) {
+        if (import.meta.env.DEV) {
+            console.log('[API请求] 开始昵称更新请求');
+            console.log('[API请求] 请求URL:', url);
+            console.log('[API请求] 请求方法:', options.method);
+            console.log('[API请求] 请求头:', options.headers);
             console.log('[API请求] 请求体:', options.body);
+            console.log('[API请求] 更新任务数据:', options.body);
+        }
+    } else if (isLongTermTaskRequest && options.body) {
+        if (import.meta.env.DEV) {
+            console.log('[API请求] 长期任务请求');
+            console.log('[API请求] 请求URL:', url);
+            console.log('[API请求] 请求方法:', options.method);
+            try {
+                const bodyData = JSON.parse(options.body);
+                console.log('[API请求] sub_task_ids:', bodyData.sub_task_ids);
+                console.log('[API请求] sub_task_ids类型:', typeof bodyData.sub_task_ids);
+                console.log('[API请求] sub_task_ids字符串:', JSON.stringify(bodyData.sub_task_ids));
+            } catch (e) {
+                console.log('[API请求] 请求体:', options.body);
+            }
         }
     } else {
-        console.log('API Request:', url, options);
+        if (import.meta.env.DEV) {
+            console.log('API Request:', url, options);
+        }
     }
     
     const response = await fetch(`${API_BASE_URL}${url}`, {
@@ -44,9 +51,13 @@ console.log('[API请求] 更新任务数据:', options.body);
     });
 
     if (isNicknameUpdate) {
-        console.log('[API响应] 昵称更新响应状态:', response.status, response.statusText);
+        if (import.meta.env.DEV) {
+            console.log('[API响应] 昵称更新响应状态:', response.status, response.statusText);
+        }
     } else {
-        console.log('API Response:', response.status, response.statusText);
+        if (import.meta.env.DEV) {
+            console.log('API Response:', response.status, response.statusText);
+        }
     }
 
     if (!response.ok) {
@@ -86,7 +97,7 @@ console.log('[API请求] 更新任务数据:', options.body);
  * @returns {Promise<Array>} - 任务列表
  */
 export async function getTasksInDateRange(startDate, endDate, userId) {
-    return request(`/tasks/range?start_date=${startDate}&end_date=${endDate}&user_id=${userId}`);
+    return request(`/api/v1/tasks?start_date=${startDate}&end_date=${endDate}&user_id=${userId}`);
 }
 
 /**
@@ -95,7 +106,7 @@ export async function getTasksInDateRange(startDate, endDate, userId) {
  * @returns {Promise<Array>} - 任务列表
  */
 export async function getAllTasksForUser(userId) {
-    return request(`/tasks?user_id=${userId}`);
+    return request(`/api/v1/tasks?user_id=${userId}`);
 }
 
 /**
@@ -104,7 +115,7 @@ export async function getAllTasksForUser(userId) {
  * @returns {Promise<Array>} - 长期任务列表
  */
 export async function getAllLongTermTasks(userId) {
-    return request(`/long_term_tasks?user_id=${userId}`);
+    return request(`/api/v1/long-term-tasks?user_id=${userId}`);
 }
 
 /**
@@ -113,11 +124,11 @@ export async function getAllLongTermTasks(userId) {
  * @returns {Promise<Array>} - 长期任务列表
  */
 export async function getAllUncompletedLongTermTasks(userId) {
-    return request(`/long_term_tasks/uncompleted?user_id=${userId}`);
+    return request(`/api/v1/long-term-tasks/uncompleted?user_id=${userId}`);
 }
 
 export async function getUrgentTasks(userId) {
-    return request(`/urgent_tasks?user_id=${userId}`);
+    return request(`/api/v1/tasks/urgent?user_id=${userId}`);
 }
 
 /**
@@ -126,7 +137,7 @@ export async function getUrgentTasks(userId) {
  * @returns {Promise<object>} - 创建的任务
  */
 export async function createTask(taskData) {
-    return request('/tasks', {
+    return request('/api/v1/tasks', {
         method: 'POST',
         body: JSON.stringify(taskData),
     });
@@ -138,7 +149,7 @@ export async function createTask(taskData) {
  * @returns {Promise<boolean>} - 是否删除成功
  */
 export async function deleteTask(taskId) {
-    return request(`/tasks/${taskId}`, {
+    return request(`/api/v1/tasks/${taskId}`, {
         method: 'DELETE',
     });
 }
@@ -149,7 +160,7 @@ export async function deleteTask(taskId) {
  * @returns {Promise<object>} - 任务对象
  */
 export async function getTaskById(taskId) {
-    return request(`/tasks/${taskId}`);
+    return request(`/api/v1/tasks/${taskId}`);
 }
 
 /**
@@ -158,7 +169,7 @@ export async function getTaskById(taskId) {
  * @returns {Promise<object>} - 长期任务对象
  */
 export async function getLongTermTaskById(taskId) {
-    return request(`/long_term_tasks/${taskId}`);
+    return request(`/api/v1/long-term-tasks/${taskId}`);
 }
 
 /**
@@ -168,7 +179,7 @@ export async function getLongTermTaskById(taskId) {
  * @returns {Promise<boolean>} - 是否更新成功
  */
 export async function updateTask(taskId, taskData) {
-    return request(`/tasks/${taskId}`, {
+    return request(`/api/v1/tasks/${taskId}`, {
         method: 'PUT',
         body: JSON.stringify(taskData),
     });
@@ -180,7 +191,7 @@ export async function updateTask(taskId, taskData) {
  * @returns {Promise<object>} - 创建的长期任务
  */
 export async function createLongTermTask(taskData) {
-    return request('/long_term_tasks', {
+    return request('/api/v1/long-term-tasks', {
         method: 'POST',
         body: JSON.stringify(taskData),
     });
@@ -192,7 +203,7 @@ export async function createLongTermTask(taskData) {
  * @returns {Promise<boolean>} - 是否删除成功
  */
 export async function deleteLongTermTask(taskId) {
-    return request(`/long_term_tasks/${taskId}`, {
+    return request(`/api/v1/long-term-tasks/${taskId}`, {
         method: 'DELETE',
     });
 }
@@ -204,7 +215,7 @@ export async function deleteLongTermTask(taskId) {
  * @returns {Promise<boolean>} - 是否更新成功
  */
 export async function updateLongTermTask(taskId, taskData) {
-    return request(`/long_term_tasks/${taskId}`, {
+    return request(`/api/v1/long-term-tasks/${taskId}`, {
         method: 'PUT',
         body: JSON.stringify(taskData),
     });
@@ -217,7 +228,7 @@ export async function updateLongTermTask(taskId, taskData) {
  * @returns {Promise<object|null>} - 日志对象
  */
 export async function getJournalByDate(date, userId) {
-    return request(`/journals/${date}?user_id=${userId}`);
+    return request(`/api/v1/journals/${date}?user_id=${userId}`);
 }
 
 /**
@@ -228,8 +239,8 @@ export async function getJournalByDate(date, userId) {
  * @returns {Promise<boolean>} - 是否更新成功
  */
 export async function updateJournalContent(date, content, userId) {
-    // 使用新的 PUT /journals/{date}/content 接口
-    return request(`/journals/${date}/content`, {
+    // 使用新的 PUT /api/v1/journals/{date} 接口
+    return request(`/api/v1/journals/${date}`, {
         method: 'PUT',
         body: JSON.stringify({ content, user_id: userId }),
     });
@@ -243,7 +254,7 @@ export async function updateJournalContent(date, content, userId) {
  * @returns {Promise<Array<number>>} - 有日志的日期列表
  */
 export async function getJournalDates(year, month, userId) {
-    return request(`/journals/dates?year=${year}&month=${month}&user_id=${userId}`);
+    return request(`/api/v1/journals/dates?year=${year}&month=${month}&user_id=${userId}`);
 }
 
 /**
@@ -254,7 +265,7 @@ export async function getJournalDates(year, month, userId) {
  * @returns {Promise<Array<boolean>>} - 日志状态列表
  */
 export async function getJournalStatus(year, month, userId) {
-    return request(`/journals/status?year=${year}&month=${month}&user_id=${userId}`);
+    return request(`/api/v1/journals/status?year=${year}&month=${month}&user_id=${userId}`);
 }
 
 /**
@@ -265,7 +276,7 @@ export async function getJournalStatus(year, month, userId) {
  * @returns {Promise<Array<number>>} - 热力图数据
  */
 export async function getHeatmapData(year, month, userId) {
-    return request(`/heatmap?year=${year}&month=${month}&user_id=${userId}`);
+    return request(`/api/v1/stats/heatmap?year=${year}&month=${month}&user_id=${userId}`);
 }
 
 /**
@@ -277,7 +288,7 @@ export async function getHeatmapData(year, month, userId) {
 export async function register(username, password) {
     // 注册时前端需传递 passwordHash 字段
     const passwordHash = await hashPassword(password);
-    return request('/api/register', {
+    return request('/api/v1/auth/register', {
         method: 'POST',
         body: JSON.stringify({ username, passwordHash }),
     });
@@ -285,12 +296,8 @@ export async function register(username, password) {
 
 // 前端密码哈希函数（与后端一致，SHA256）
 async function hashPassword(password) {
-    // 浏览器环境下使用 SubtleCrypto
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    // 使用 js-sha256 库进行哈希
+    return sha256(password);
 }
 
 /**
@@ -302,7 +309,7 @@ async function hashPassword(password) {
 export async function login(username, password) {
     // 登录时前端需传递 passwordHash 字段
     const passwordHash = await hashPassword(password);
-    return request('/api/login', {
+    return request('/api/v1/auth/login', {
         method: 'POST',
         body: JSON.stringify({ username, passwordHash }),
     });
@@ -318,7 +325,7 @@ export async function login(username, password) {
 export async function registerWithNickname(username, password, nickname) {
     // 注册时前端需传递 passwordHash 字段
     const passwordHash = await hashPassword(password);
-    return request('/api/register', {
+    return request('/api/v1/auth/register', {
         method: 'POST',
         body: JSON.stringify({ username, passwordHash, nickname }),
     });
@@ -333,7 +340,7 @@ export async function registerWithNickname(username, password, nickname) {
  */
 export async function updatePassword(userId, currentPassword, newPassword) {
     // 前端不需要哈希密码，后端会处理
-    return request('/api/update-password', {
+    return request('/api/v1/auth/password', {
         method: 'PUT',
         body: JSON.stringify({ 
             user_id: userId, 
@@ -361,7 +368,7 @@ export async function updateNickname(userId, newNickname) {
     console.log('[API - 昵称更新] 请求体数据:', requestData)
     
     try {
-        const result = await request('/api/update-nickname', {
+        const result = await request('/api/v1/auth/nickname', {
             method: 'PUT',
             body: JSON.stringify(requestData),
         });
@@ -379,7 +386,7 @@ export async function updateNickname(userId, newNickname) {
  * @returns {Promise<object|null>} - 设置对象
  */
 export async function getSettings(userId) {
-    return request(`/settings/${userId}`);
+    return request(`/api/v1/settings/${userId}`);
 }
 
 /**
@@ -388,7 +395,7 @@ export async function getSettings(userId) {
  * @returns {Promise<object>} - 创建的设置对象
  */
 export async function createSettings(settingsData) {
-    return request('/settings', {
+    return request('/api/v1/settings', {
         method: 'POST',
         body: JSON.stringify(settingsData),
     });
@@ -401,7 +408,7 @@ export async function createSettings(settingsData) {
  * @returns {Promise<object>} - 更新后的设置对象
  */
 export async function updateSettings(userId, settingsData) {
-    return request(`/settings/${userId}`, {
+    return request(`/api/v1/settings/${userId}`, {
         method: 'PUT',
         body: JSON.stringify(settingsData),
     });
@@ -413,7 +420,7 @@ export async function updateSettings(userId, settingsData) {
  * @returns {Promise<object|null>} - 备忘录对象
  */
 export async function getMemo(userId) {
-    return request(`/memos/${userId}`);
+    return request(`/api/v1/memos/${userId}`);
 }
 
 /**
@@ -423,7 +430,7 @@ export async function getMemo(userId) {
  * @returns {Promise<object>} - 更新后的备忘录对象
  */
 export async function updateMemo(userId, content) {
-    return request(`/memos/${userId}`, {
+    return request(`/api/v1/memos/${userId}`, {
         method: 'PUT',
         body: JSON.stringify({ content }),
     });
