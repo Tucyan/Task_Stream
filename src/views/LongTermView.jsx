@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import * as api from '../services/api.js'
 import LongTermTaskModal from '../components/LongTermTaskModal.jsx'
-import SubtaskManager from '../components/SubtaskManager.jsx'
+import SubtaskManager from '../components/SubTaskManager.jsx'
 import SubtaskEditor from '../components/SubtaskEditor.jsx'
 import taskEventBus from '../utils/eventBus.js'
 
