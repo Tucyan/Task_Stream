@@ -481,12 +481,14 @@ def get_urgent_tasks(user_id: int, db: Session) -> List[dict]:
     short_tasks = db.query(models.Task).filter(
         models.Task.user_id == user_id,
         models.Task.due_date.isnot(None),
+        models.Task.due_date != "",
         models.Task.status != 3
     ).all()
     # 获取所有有截止时间且未完成的长期任务（progress < 1.0）
     long_tasks = db.query(models.LongTermTask).filter(
         models.LongTermTask.user_id == user_id,
         models.LongTermTask.due_date.isnot(None),
+        models.LongTermTask.due_date != "",
         models.LongTermTask.progress < 1.0
     ).all()
 

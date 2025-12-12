@@ -14,18 +14,31 @@ export default function Sidebar({ currentView, setCurrentView, primaryColor, use
   const cellsToFill = 42 - totalCells
 
   useEffect(() => {
-    if (!userId) return
+    console.log('Sidebar: useEffect triggered', { userId, heatmapDate, heatmapTrigger })
+    if (!userId) {
+      console.warn('Sidebar: userId is missing')
+      return
+    }
     const fetchHeatmap = async () => {
       try {
         const queryYear = heatmapDate.getFullYear()
         const queryMonth = heatmapDate.getMonth() + 1
-        const response = await fetch(`http://127.0.0.1:8000/heatmap?year=${queryYear}&month=${queryMonth}&user_id=${userId}`)
+        // Updated URL to match backend endpoint: /api/v1/stats/heatmap
+        const url = `http://127.0.0.1:8000/api/v1/stats/heatmap?year=${queryYear}&month=${queryMonth}&user_id=${userId}`
+        console.log('Sidebar: Fetching heatmap', url)
+        
+        const response = await fetch(url)
+        console.log('Sidebar: Response status', response.status)
+        
         if (response.ok) {
           const data = await response.json()
+          console.log('Sidebar: Heatmap data received', data)
           setHeatmapData(data)
+        } else {
+          console.error('Sidebar: Failed to fetch heatmap', response.statusText)
         }
       } catch (error) {
-        console.error("Failed to fetch heatmap data", error)
+        console.error("Sidebar: Error fetching heatmap data", error)
       }
     }
     fetchHeatmap()
