@@ -9,6 +9,7 @@ export default function JournalView({ userId }) {
   const [journalContent, setJournalContent] = useState('')
   const [journalStatus, setJournalStatus] = useState([])
   const [isPreview, setIsPreview] = useState(false)
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false) // Mobile calendar toggle state
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -70,18 +71,38 @@ export default function JournalView({ userId }) {
 
   const handleDayClick = (day) => {
     setSelectedDay(day)
+    setIsCalendarOpen(false) // Close calendar after selection on mobile
   }
   return (
-    <div className="h-full flex gap-6 max-w-7xl mx-auto">
-      <div className="w-80 bg-card rounded-3xl p-6 shadow-sm flex flex-col">
+    <div className="h-full flex flex-col md:flex-row gap-4 md:gap-6 max-w-7xl mx-auto relative">
+      {/* Mobile Calendar Toggle Header */}
+      <div 
+        className="md:hidden flex items-center justify-between bg-card rounded-2xl p-4 shadow-sm cursor-pointer border border-gray-100 dark:border-gray-700"
+        onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+      >
+        <div className="flex items-center gap-2 dark:text-white">
+          <i className="fa-solid fa-calendar-days text-primary"></i>
+          <span className="font-bold">{year}年{month + 1}月</span>
+          <span className="text-sm opacity-60 ml-2">已写 {journalStatus.filter(Boolean).length} 篇</span>
+        </div>
+        <i className={`fa-solid fa-chevron-down transition-transform duration-300 ${isCalendarOpen ? 'rotate-180' : ''} text-gray-400`}></i>
+      </div>
+
+      <div className={`
+        md:w-80 bg-card rounded-3xl p-6 shadow-sm flex flex-col md:flex
+        fixed md:static inset-x-4 top-20 z-50 md:z-auto
+        transition-all duration-300 origin-top
+        ${isCalendarOpen ? 'scale-y-100 opacity-100' : 'scale-y-0 opacity-0 md:scale-y-100 md:opacity-100 hidden md:flex'}
+        border border-gray-100 dark:border-gray-700 md:border-none
+      `}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg dark:text-white">日志归档</h3>
           <div className="flex items-center gap-2 text-sm dark:text-gray-300">
-            <button onClick={prevMonth} className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
+            <button onClick={(e) => { e.stopPropagation(); prevMonth() }} className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
               <i className="fa-solid fa-chevron-left text-xs"></i>
             </button>
             <span className="font-medium min-w-[80px] text-center">{year}年{month + 1}月</span>
-            <button onClick={nextMonth} className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
+            <button onClick={(e) => { e.stopPropagation(); nextMonth() }} className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
               <i className="fa-solid fa-chevron-right text-xs"></i>
             </button>
           </div>
@@ -122,7 +143,15 @@ export default function JournalView({ userId }) {
           </div>
         </div>
       </div>
-      <div className="flex-1 bg-card rounded-3xl p-8 shadow-sm flex flex-col relative overflow-hidden">
+      {/* Mobile Backdrop */}
+      {isCalendarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/20 z-40 md:hidden"
+          onClick={() => setIsCalendarOpen(false)}
+        ></div>
+      )}
+
+      <div className="flex-1 bg-card rounded-3xl p-6 md:p-8 shadow-sm flex flex-col relative overflow-hidden h-[calc(100vh-140px)] md:h-auto">
         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
           <i className="fa-solid fa-feather text-9xl"></i>
         </div>

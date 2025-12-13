@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import AuthModal from './components/AuthModal.jsx'
 import Sidebar from './components/Sidebar.jsx'
+import MobileNav from './components/MobileNav.jsx'
 import HeaderBar from './components/HeaderBar.jsx'
 import MainContent from './components/MainContent.jsx'
 import ResultModal from './components/ResultModal.jsx'
@@ -654,7 +655,7 @@ function App() {
         />
       )}
           {isLoggedIn && (
-            <div className="flex-1 flex overflow-hidden min-h-0">
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 relative">
               <Sidebar 
                 currentView={currentView} 
                 setCurrentView={setCurrentView} 
@@ -663,8 +664,9 @@ function App() {
                 userId={userId}
                 heatmapTrigger={heatmapTrigger}
                 onHeatmapClick={handleHeatmapClick}
+                className="hidden md:flex flex-none"
               />
-              <main className="flex-1 min-h-0 flex flex-col relative overflow-hidden bg-page transition-colors duration-300">
+              <main className="flex-1 min-h-0 flex flex-col relative overflow-hidden bg-page transition-colors duration-300 pb-[60px] md:pb-0">
                 <HeaderBar 
                   pageTitle={pageTitle} 
                   onLogout={() => {
@@ -704,6 +706,16 @@ function App() {
                   presetColors={presetColors}
                   resetTheme={resetTheme}
                   saveSettings={saveSettings}
+                  // Pass user data to SettingsView for mobile profile management
+                  user={user}
+                  onLogout={() => {
+                    setIsLoggedIn(false)
+                    setUser(null)
+                    localStorage.removeItem('taskStreamUser')
+                    localStorage.removeItem('taskStreamSettings')
+                    resetLocalTheme()
+                  }}
+                  onUserUpdate={handleUserUpdate}
                   // New props for CRUD
                   onAddTask={handleAddTask}
                   onEditTask={handleEditTask}
@@ -712,6 +724,24 @@ function App() {
                   onTaskUpdate={handleTaskUpdate}
                 />
               </main>
+              <MobileNav
+                currentView={currentView}
+                setCurrentView={setCurrentView}
+                primaryColor={settings.primary}
+                userId={userId}
+                heatmapTrigger={heatmapTrigger}
+                onHeatmapClick={handleHeatmapClick}
+                user={user}
+                onLogout={() => {
+                  setIsLoggedIn(false)
+                  setUser(null)
+                  localStorage.removeItem('taskStreamUser')
+                  localStorage.removeItem('taskStreamSettings')
+                  resetLocalTheme()
+                }}
+                onUserUpdate={handleUserUpdate}
+                className="md:hidden absolute bottom-0 left-0 right-0 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]"
+              />
             </div>
           )}
       <ResultModal visible={showResultModal} onClose={() => setShowResultModal(false)} />

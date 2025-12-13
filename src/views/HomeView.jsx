@@ -85,38 +85,60 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
         }
     }, 1000)
   }
+
+  // Mobile View Swipe Logic
+  const [mobileView, setMobileView] = useState(0) // 0: Welcome+Today, 1: Memo+Urgent
+  const touchStartRef = useRef(null)
+  
+  const handleTouchStart = (e) => {
+    touchStartRef.current = e.touches[0].clientX
+  }
+  
+  const handleTouchEnd = (e) => {
+    if (!touchStartRef.current) return
+    
+    const touchEnd = e.changedTouches[0].clientX
+    const diff = touchStartRef.current - touchEnd
+    
+    // Threshold for swipe (e.g., 50px)
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        // Swiped Left -> Next View
+        setMobileView(prev => Math.min(1, prev + 1))
+      } else {
+        // Swiped Right -> Prev View
+        setMobileView(prev => Math.max(0, prev - 1))
+      }
+    }
+    
+    touchStartRef.current = null
+  }
+
   return (
-    <div className="max-w-7xl mx-auto h-full flex flex-col gap-6">
-      <div className="flex gap-6 h-40">
-        <div className="flex-[2] bg-gradient-to-r from-primary to-purple-400 rounded-3xl p-8 text-white shadow-lg relative overflow-hidden group">
+    <div 
+      className="max-w-7xl mx-auto h-full flex flex-col md:flex-row gap-4 md:gap-6 overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Column 1: Welcome + Today Tasks */}
+      <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${mobileView === 0 ? 'block' : 'hidden md:flex'} h-full overflow-y-auto md:overflow-visible pb-4 md:pb-0`}>
+        {/* Welcome Card */}
+        <div className="bg-gradient-to-r from-primary to-purple-400 rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden group min-h-[160px] md:h-40 shrink-0">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
-          <h2 className="text-3xl font-bold mb-2">早安!</h2>
+          <h2 className="text-2xl md:text-3xl font-bold mb-2">早安!</h2>
           <p className="opacity-90">今天有 {todayTasks.filter(t => !t.completed).length} 项待办，请合理安排时间。</p>
           <button className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-lg text-sm hover:bg-white/30 transition-colors">查看概览</button>
         </div>
-        <div className="flex-1 bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col relative">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-bold text-gray-500 dark:text-gray-400 text-sm">近期目标 (Memo)</h3>
-            <i className="fa-solid fa-pen text-xs text-primary cursor-pointer"></i>
-          </div>
-          <textarea 
-            className="w-full flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed dark:text-white" 
-            placeholder="在这里写下你的近期小目标..." 
-            value={memoContent}
-            onChange={handleMemoChange}
-          />
-          <div className="absolute bottom-4 right-6 text-xs text-gray-400 dark:text-gray-500">{memoDate || '今天'}</div>
-        </div>
-      </div>
-      <div className="flex-1 flex gap-6 min-h-0">
-        <div className="flex-[2] bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col">
+        
+        {/* Today Tasks */}
+        <div className="flex-1 bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col min-h-[400px] md:min-h-0">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-bold dark:text-white">今日日程</h3>
             <button onClick={onAddTask} className="w-8 h-8 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all flex items-center justify-center">
               <i className="fa-solid fa-plus"></i>
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+          <div className="flex-1 overflow-y-visible md:overflow-y-auto space-y-3 pr-2">
             {todayTasks.map((task, index) => (
               <div key={index} className="group flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-white/5 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all cursor-pointer">
                 <div onClick={() => onToggleTask(index)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors ${task.completed ? 'bg-primary border-primary' : 'border-gray-300 dark:border-gray-600'}`}>
@@ -138,9 +160,29 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
             ))}
           </div>
         </div>
-        <div className="flex-1 bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col relative group justify-center">
+      </div>
+
+      {/* Column 2: Memo + Urgent Tasks */}
+      <div className={`w-full md:w-96 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${mobileView === 1 ? 'block' : 'hidden md:flex'} h-full overflow-y-auto md:overflow-visible pb-4 md:pb-0`}>
+        {/* Memo Card */}
+        <div className="bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col relative min-h-[160px] md:h-40 shrink-0">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="font-bold text-gray-500 dark:text-gray-400 text-sm">近期目标 (Memo)</h3>
+            <i className="fa-solid fa-pen text-xs text-primary cursor-pointer"></i>
+          </div>
+          <textarea 
+            className="w-full flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed dark:text-white" 
+            placeholder="在这里写下你的近期小目标..." 
+            value={memoContent}
+            onChange={handleMemoChange}
+          />
+          <div className="absolute bottom-4 right-6 text-xs text-gray-400 dark:text-gray-500">{memoDate || '今天'}</div>
+        </div>
+
+        {/* Urgent Tasks */}
+        <div className="flex-1 bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col relative group justify-center min-h-[200px] md:min-h-0">
           {/* 左切换按钮 */}
-          <button 
+          <button  
             onClick={handlePrevUrgent} 
             className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-primary hover:text-white shadow-md z-10 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 text-gray-600 dark:text-gray-300 backdrop-blur-sm"
           >
@@ -195,6 +237,12 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
             )}
           </div>
         </div>
+      </div>
+
+      {/* Mobile View Indicators */}
+      <div className="md:hidden absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+        <div className={`w-2 h-2 rounded-full transition-colors ${mobileView === 0 ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+        <div className={`w-2 h-2 rounded-full transition-colors ${mobileView === 1 ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
       </div>
     </div>
   )

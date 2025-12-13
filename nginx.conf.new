@@ -1,0 +1,59 @@
+server {
+    listen 80;
+    server_name taskstream.xyz;
+
+    # 🔑 指向 React 构建产物目录（必须是 dist/！）
+    root /var/www/task-stream/dist;
+    index index.html;
+
+    # 💨 Gzip 压缩优化 (大幅减少传输体积)
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
+
+    # 🛡️ 安全响应头
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-XSS-Protection "1; mode=block";
+    add_header X-Content-Type-Options "nosniff";
+
+    # 📦 上传大小限制 (根据需求调整)
+    client_max_body_size 10M;
+
+    # 🌐 SPA 路由支持（React Router 必需！）
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 🚀 静态资源优化
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # 🤖 忽略 favicon 和 robots 的日志 (可选)
+    location = /favicon.ico { log_not_found off; access_log off; }
+    location = /robots.txt  { log_not_found off; access_log off; }
+
+    # 🔁 API 统一代理
+    # 由于所有后端接口已标准化为 /api/v1/...，
+    # 我们只需要这一个 location 块即可处理所有 API 请求。
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        
+        # ⏱️ 超时设置 (防止长请求中断)
+        proxy_connect_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+
+        # 支持 WebSocket (如果需要)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}

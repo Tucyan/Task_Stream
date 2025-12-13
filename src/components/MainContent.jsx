@@ -35,11 +35,14 @@ export default function MainContent({
   onEditTask,
   onDeleteTask,
   userId,
-  onTaskUpdate
+  onTaskUpdate,
+  user,
+  onLogout,
+  onUserUpdate
 }) {
   return (
     <div className="flex-1 min-h-0 flex flex-col relative bg-page transition-colors duration-300">
-      <div className="flex-1 min-h-0 p-8 pt-2">
+      <div className={`flex-1 min-h-0 ${currentView === 'settings' ? 'p-0' : 'p-4 pt-8'} md:p-8 md:pt-2`}>
         {currentView === 'home' && (
           <HomeView 
             todayTasks={todayTasks} 
@@ -88,6 +91,9 @@ export default function MainContent({
             presetColors={presetColors}
             resetTheme={resetTheme}
             saveSettings={saveSettings}
+            user={user}
+            onLogout={onLogout}
+            onUserUpdate={onUserUpdate}
           />
         )}
       </div>

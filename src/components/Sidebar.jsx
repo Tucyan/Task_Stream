@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 
-export default function Sidebar({ currentView, setCurrentView, primaryColor, userId, heatmapTrigger, onHeatmapClick }) {
+export default function Sidebar({ currentView, setCurrentView, primaryColor, userId, heatmapTrigger, onHeatmapClick, className = '' }) {
   const [heatmapDate, setHeatmapDate] = useState(new Date())
   const [heatmapData, setHeatmapData] = useState([])
 
@@ -92,7 +92,7 @@ export default function Sidebar({ currentView, setCurrentView, primaryColor, use
   )
 
   return (
-    <aside className="h-full w-64 bg-card border-r border-gray-200 dark:border-gray-700 flex flex-col shadow-sm z-20 transition-colors duration-300">
+    <aside className={`h-full w-64 bg-card border-r border-gray-200 dark:border-gray-700 flex flex-col shadow-sm z-20 transition-colors duration-300 ${className}`}>
       <div className="p-6">
         <div className="flex items-center gap-3 text-primary text-2xl font-bold mb-8">
           <i className="fa-solid fa-layer-group"></i>

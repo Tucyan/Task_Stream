@@ -1,6 +1,60 @@
-import React from 'react'
+import React, { useState } from 'react'
+import * as api from '../services/api.js'
 
-export default function SettingsView({ isDarkMode, toggleDarkMode, settings, setSettings, presetColors, resetTheme, saveSettings }) {
+export default function SettingsView({ isDarkMode, toggleDarkMode, settings, setSettings, presetColors, resetTheme, saveSettings, user, onLogout, onUserUpdate }) {
+  const [nickname, setNickname] = useState(user?.nickname || '')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [isAccountOpen, setIsAccountOpen] = useState(false)
+
+  const handleUpdateNickname = async () => {
+    if (!nickname.trim()) {
+      setError('昵称不能为空')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      await api.updateNickname(user.id, nickname)
+      const updatedUser = { ...user, nickname: nickname }
+      const savedUser = localStorage.getItem('taskStreamUser')
+      if (savedUser) {
+        const userInfo = JSON.parse(savedUser)
+        userInfo.nickname = nickname
+        localStorage.setItem('taskStreamUser', JSON.stringify(userInfo))
+      }
+      if (onUserUpdate) onUserUpdate(updatedUser)
+      setSuccess('昵称更新成功')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (e) {
+      setError(e.message || '更新昵称失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdatePassword = async () => {
+    if (!currentPassword.trim() || !newPassword.trim()) {
+      setError('请输入当前密码和新密码')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      await api.updatePassword(user.id, currentPassword, newPassword)
+      setSuccess('密码更新成功')
+      setCurrentPassword('')
+      setNewPassword('')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (e) {
+      setError(e.message || '更新密码失败')
+    } finally {
+      setLoading(false)
+    }
+  }
   
   const handleColorChange = (key, value) => {
     const newSettings = { ...settings, [key]: value }
@@ -20,13 +74,88 @@ export default function SettingsView({ isDarkMode, toggleDarkMode, settings, set
 
   return (
     <div className="max-w-4xl mx-auto h-full min-h-0 flex flex-col">
-      <div className="bg-card rounded-3xl shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
-        <div className="p-8 border-b border-gray-100 dark:border-gray-700">
+      <div className="bg-card md:rounded-3xl rounded-none shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="p-6 md:p-8 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-2xl font-bold mb-2 dark:text-white">个性化设置</h2>
           <p className="text-sm opacity-60 dark:text-gray-400">定制属于你的 Task Stream 视觉体验</p>
         </div>
-        <div className="p-8 space-y-10 flex-1 min-h-0 overflow-y-auto pr-2">
-          <section>
+        <div className="md:p-8 p-0 space-y-6 md:space-y-10 flex-1 min-h-0 overflow-y-auto pr-2">
+          {/* 移动端专用的用户设置区域 */}
+          <section className="md:hidden bg-primary/5 md:rounded-2xl rounded-none border-y md:border border-primary/10 dark:border-gray-700 overflow-hidden">
+            <h3 
+              className="font-bold p-6 flex items-center justify-between cursor-pointer dark:text-white hover:bg-primary/5 transition-colors"
+              onClick={() => setIsAccountOpen(!isAccountOpen)}
+            >
+              <span className="flex items-center gap-2">
+                <i className="fa-solid fa-user-gear"></i> 账户设置
+              </span>
+              <i className={`fa-solid fa-chevron-down transition-transform duration-300 ${isAccountOpen ? 'rotate-180' : ''}`}></i>
+            </h3>
+            
+            {isAccountOpen && (
+              <div className="space-y-6 px-6 pb-6">
+                <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-sm">
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">用户名</div>
+                <div className="font-medium dark:text-white flex justify-between items-center">
+                  {user?.username}
+                  <button onClick={onLogout} className="text-xs px-2 py-1 bg-red-50 text-red-500 rounded hover:bg-red-100">退出登录</button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium dark:text-gray-300">修改昵称</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={nickname} 
+                    onChange={e => setNickname(e.target.value)} 
+                    placeholder="输入新昵称"
+                    className="flex-1 px-3 py-2 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary outline-none dark:text-white"
+                  />
+                  <button 
+                    onClick={handleUpdateNickname}
+                    disabled={loading}
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 text-sm whitespace-nowrap"
+                  >
+                    更新
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium dark:text-gray-300">修改密码</label>
+                <input 
+                  type="password" 
+                  value={currentPassword} 
+                  onChange={e => setCurrentPassword(e.target.value)} 
+                  placeholder="当前密码"
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary outline-none dark:text-white mb-2"
+                />
+                <div className="flex gap-2">
+                  <input 
+                    type="password" 
+                    value={newPassword} 
+                    onChange={e => setNewPassword(e.target.value)} 
+                    placeholder="新密码"
+                    className="flex-1 px-3 py-2 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary outline-none dark:text-white"
+                  />
+                  <button 
+                    onClick={handleUpdatePassword}
+                    disabled={loading}
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 text-sm whitespace-nowrap"
+                  >
+                    修改
+                  </button>
+                </div>
+              </div>
+
+              {error && <div className="text-red-500 text-sm bg-red-50 p-2 rounded">{error}</div>}
+              {success && <div className="text-green-500 text-sm bg-green-50 p-2 rounded">{success}</div>}
+            </div>
+          )}
+          </section>
+
+          <section className="px-6 md:px-0">
             <h3 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><i className="fa-solid fa-moon"></i> 明暗模式</h3>
             <div className="flex gap-4">
               <button onClick={() => toggleDarkMode(false)} className={`flex-1 p-4 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-all flex items-center justify-center gap-2 dark:text-gray-800 ${!isDarkMode ? 'ring-2 ring-primary' : ''}`}>
@@ -37,7 +166,7 @@ export default function SettingsView({ isDarkMode, toggleDarkMode, settings, set
               </button>
             </div>
           </section>
-          <section>
+          <section className="px-6 md:px-0">
             <h3 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><i className="fa-solid fa-palette"></i> 强调色 (Accent Color)</h3>
             <div className="flex gap-4 flex-wrap">
               {presetColors.map((color) => (
@@ -47,7 +176,7 @@ export default function SettingsView({ isDarkMode, toggleDarkMode, settings, set
               ))}
             </div>
           </section>
-          <section className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-700">
+          <section className="bg-gray-50 dark:bg-gray-800/50 p-6 md:rounded-2xl rounded-none border-y md:border border-gray-100 dark:border-gray-700">
             <h3 className="font-bold mb-6 flex items-center justify-between dark:text-white">
               <span className="flex items-center gap-2"><i className="fa-solid fa-sliders"></i> 高级自定义设置</span>
               <span className="text-xs font-normal bg-primary text-white px-2 py-1 rounded">PRO</span>

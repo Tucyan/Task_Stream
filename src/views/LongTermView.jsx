@@ -344,43 +344,41 @@ export default function LongTermView({ userId, onTaskUpdate }) {
     <div className="h-full min-h-0 flex flex-col gap-6 max-w-7xl mx-auto w-full">
       {/* Filter Section - Consistent with DetailView */}
       <div className="flex items-center justify-between gap-4">
-        <div>
+        <div className="shrink-0">
           <h2 className="text-2xl font-bold dark:text-white">长期任务</h2>
-          <p className="text-sm opacity-60 dark:text-gray-400">规划您的长远目标与里程碑</p>
+          <p className="text-sm opacity-60 dark:text-gray-400 hidden md:block">规划您的长远目标与里程碑</p>
         </div>
-        <div className="flex gap-3">
-          <div className="relative group">
+        <div className="flex flex-1 items-center justify-end gap-3 min-w-0">
+          <div className="relative group flex-1 md:flex-none">
             <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors"></i>
-            <input type="text" value={detailSearch} onChange={(e) => setDetailSearch(e.target.value)} placeholder="搜索任务..." className="pl-10 pr-4 py-2.5 rounded-xl bg-card border border-gray-100 dark:border-gray-700 focus:ring-2 ring-primary/20 outline-none w-64 transition-all shadow-sm dark:text-white dark:bg-gray-800" />
+            <input type="text" value={detailSearch} onChange={(e) => setDetailSearch(e.target.value)} placeholder="搜索任务..." className="pl-10 pr-4 py-2.5 rounded-xl bg-card border border-gray-100 dark:border-gray-700 focus:ring-2 ring-primary/20 outline-none w-full md:w-64 transition-all shadow-sm dark:text-white dark:bg-gray-800" />
           </div>
-          <button onClick={handleAddTask} className="bg-primary text-white px-4 py-2.5 rounded-xl shadow-lg shadow-primary/30 hover:brightness-110 transition-all flex items-center gap-2">
+          <button onClick={handleAddTask} className="bg-primary text-white px-4 py-2.5 rounded-xl shadow-lg shadow-primary/30 hover:brightness-110 transition-all flex items-center gap-2 shrink-0">
             <i className="fa-solid fa-plus"></i> <span className="hidden sm:inline">新建目标</span>
           </button>
         </div>
       </div>
 
-      <div className="bg-card rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-2 bg-gray-50 dark:bg-black/20 p-2 rounded-xl border border-gray-200 dark:border-gray-700">
-            <i className="fa-regular fa-calendar text-gray-400 ml-2"></i>
-            <input type="date" value={filterDateStart} onChange={(e) => setFilterDateStart(e.target.value)} className="bg-transparent border-none outline-none text-sm w-32 text-gray-600 dark:text-gray-300" />
-            <span className="text-gray-400">-</span>
-            <input type="date" value={filterDateEnd} onChange={(e) => setFilterDateEnd(e.target.value)} className="bg-transparent border-none outline-none text-sm w-32 text-gray-600 dark:text-gray-300" />
+      <div className="bg-card rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+          <div className="flex items-center gap-2 bg-gray-50 dark:bg-black/20 p-2 rounded-xl border border-gray-200 dark:border-gray-700 w-full sm:w-auto">
+            <i className="fa-regular fa-calendar text-gray-400 dark:text-gray-300 ml-2 shrink-0"></i>
+            <input type="date" value={filterDateStart} onChange={(e) => setFilterDateStart(e.target.value)} className="bg-transparent border-none outline-none text-sm w-full sm:w-32 text-gray-600 dark:text-gray-300 min-w-0" />
+            <span className="text-gray-400 dark:text-gray-300 shrink-0">-</span>
+            <input type="date" value={filterDateEnd} onChange={(e) => setFilterDateEnd(e.target.value)} className="bg-transparent border-none outline-none text-sm w-full sm:w-32 text-gray-600 dark:text-gray-300 min-w-0" />
+            <button onClick={() => {setFilterDateStart(''); setFilterDateEnd('')}} className={`text-xs text-red-400 hover:text-red-600 whitespace-nowrap px-2 border-l border-gray-300 dark:border-gray-600 ml-1 ${(filterDateStart || filterDateEnd) ? '' : 'invisible pointer-events-none'}`}>清除</button>
           </div>
-          {(filterDateStart || filterDateEnd) && (
-            <button onClick={() => {setFilterDateStart(''); setFilterDateEnd('')}} className="text-xs text-red-400 hover:text-red-600">清除</button>
-          )}
         </div>
-        <div className="flex bg-gray-100 dark:bg-black/20 p-1 rounded-xl">
-          <button onClick={() => setDetailFilter('all')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${detailFilter === 'all' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+        <div className="flex bg-gray-100 dark:bg-black/20 p-1 rounded-xl w-full lg:w-auto">
+          <button onClick={() => setDetailFilter('all')} className={`flex-1 lg:flex-none justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${detailFilter === 'all' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
             <span>全部</span>
             <span className={`bg-gray-200 dark:bg-gray-600 text-[10px] px-1.5 py-0.5 rounded-full ${detailFilter === 'all' ? 'bg-primary/10 text-primary' : ''}`}>{baseFilteredTasks.length}</span>
           </button>
-          <button onClick={() => setDetailFilter('pending')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${detailFilter === 'pending' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+          <button onClick={() => setDetailFilter('pending')} className={`flex-1 lg:flex-none justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${detailFilter === 'pending' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
             <span>进行中</span>
             <span className={`bg-gray-200 dark:bg-gray-600 text-[10px] px-1.5 py-0.5 rounded-full ${detailFilter === 'pending' ? 'bg-primary/10 text-primary' : ''}`}>{baseFilteredTasks.filter(t => !t.completed).length}</span>
           </button>
-          <button onClick={() => setDetailFilter('completed')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${detailFilter === 'completed' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+          <button onClick={() => setDetailFilter('completed')} className={`flex-1 lg:flex-none justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${detailFilter === 'completed' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
             <span>已达成</span>
             <span className={`bg-gray-200 dark:bg-gray-600 text-[10px] px-1.5 py-0.5 rounded-full ${detailFilter === 'completed' ? 'bg-primary/10 text-primary' : ''}`}>{baseFilteredTasks.filter(t => t.completed).length}</span>
           </button>

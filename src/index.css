@@ -56,3 +56,10 @@ body { margin: 0; font-family: 'Noto Sans SC', sans-serif; }
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: rgba(156, 163, 175, 0.4);
 }
+
+/* Dark mode date picker support */
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="datetime-local"] {
+  color-scheme: dark;
+}

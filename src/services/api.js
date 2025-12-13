@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+//这里导入了服务器的公网ip
 import sha256 from 'js-sha256';
 
 /**
