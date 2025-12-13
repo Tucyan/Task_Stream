@@ -157,7 +157,7 @@ export default function JournalView({ userId }) {
         </div>
         <div className="flex justify-between items-end mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
           <div>
-            <h2 className="text-3xl font-bold text-primary">{month + 1}月 {selectedDay}日, {currentDate.toLocaleString('zh-CN', { weekday: 'long' })}</h2>
+            <h2 className="text-3xl font-bold text-primary">{month + 1}月 {selectedDay}日</h2>
             <p className="text-sm opacity-60 mt-1 dark:text-gray-400">记录此刻的想法...</p>
           </div>
           <div className="flex gap-2">
