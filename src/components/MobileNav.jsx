@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { getHeatmapData } from '../services/api.js'
+
 export default function MobileNav({ currentView, setCurrentView, primaryColor, userId, heatmapTrigger, onHeatmapClick, className = '' }) {
   const [showHeatmap, setShowHeatmap] = useState(false)
   const [heatmapDate, setHeatmapDate] = useState(new Date())
@@ -19,13 +21,10 @@ export default function MobileNav({ currentView, setCurrentView, primaryColor, u
       try {
         const queryYear = heatmapDate.getFullYear()
         const queryMonth = heatmapDate.getMonth() + 1
-        const url = `http://127.0.0.1:8000/api/v1/stats/heatmap?year=${queryYear}&month=${queryMonth}&user_id=${userId}`
+        console.log('MobileNav: Fetching heatmap', { queryYear, queryMonth, userId })
         
-        const response = await fetch(url)
-        if (response.ok) {
-          const data = await response.json()
-          setHeatmapData(data)
-        }
+        const data = await getHeatmapData(queryYear, queryMonth, userId)
+        setHeatmapData(data)
       } catch (error) {
         console.error("MobileNav: Error fetching heatmap data", error)
       }

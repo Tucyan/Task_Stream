@@ -225,8 +225,7 @@ export default function SubtaskManager({ visible, onClose, onSave, currentUserId
                         {task.due_date && (
                           <div className="flex items-center gap-1 mt-2 text-xs text-gray-400">
                             <i className="fa-regular fa-calendar"></i>
-                            <span className="hidden sm:inline">{task.due_date}</span>
-                            <span className="sm:hidden">{task.due_date.split('T')[0]}</span>
+                            <span>{task.due_date}</span>
                           </div>
                         )}
                         {selectedTaskIds[task.id] && (
