@@ -161,13 +161,13 @@ export default function JournalView({ userId }) {
             <p className="text-sm opacity-60 mt-1 dark:text-gray-400">记录此刻的想法...</p>
           </div>
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={() => setIsPreview(!isPreview)}
               className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-600"
             >
-              {isPreview ? '编辑模式' : '预览 Markdown'}
+              {isPreview ? <span><span className="hidden sm:inline">编辑模式</span><span className="sm:hidden">编辑</span></span> : <span><span className="hidden sm:inline">预览 Markdown</span><span className="sm:hidden">预览</span></span>}
             </button>
-            <button onClick={saveJournal} className="px-4 py-2 bg-primary text-white rounded-lg text-sm shadow hover:brightness-110">保存日志</button>
+            <button onClick={saveJournal} className="px-4 py-2 bg-primary text-white rounded-lg text-sm shadow hover:brightness-110"><span className="hidden sm:inline">保存日志</span><span className="sm:hidden">保存</span></button>
           </div>
         </div>
         {isPreview ? (

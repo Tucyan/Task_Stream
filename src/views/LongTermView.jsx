@@ -484,7 +484,7 @@ export default function LongTermView({ userId, onTaskUpdate }) {
                            onClick={() => handleAddSubtask(task.id)}
                            className="w-full py-2 text-xs text-gray-400 hover:text-primary border border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-1"
                          >
-                            <i className="fa-solid fa-plus"></i> 添加子任务
+                            <i className="fa-solid fa-plus"></i> <span className="hidden sm:inline">添加子任务</span><span className="sm:hidden">添加</span>
                         </button>
                     </div>
                   </div>
