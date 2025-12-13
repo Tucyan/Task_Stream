@@ -133,6 +133,17 @@ export async function getUrgentTasks(userId) {
 }
 
 /**
+ * 获取任务热力图数据
+ * @param {number} year - 年份
+ * @param {number} month - 月份
+ * @param {number} userId - 用户 ID
+ * @returns {Promise<Array>} - 热力图数据
+ */
+export async function getHeatmapData(year, month, userId) {
+    return request(`/api/v1/stats/heatmap?year=${year}&month=${month}&user_id=${userId}`);
+}
+
+/**
  * 创建新任务
  * @param {object} taskData - 任务数据
  * @returns {Promise<object>} - 创建的任务

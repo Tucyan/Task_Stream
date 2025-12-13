@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { getHeatmapData } from '../services/api.js'
 
 export default function Sidebar({ currentView, setCurrentView, primaryColor, userId, heatmapTrigger, onHeatmapClick, className = '' }) {
   const [heatmapDate, setHeatmapDate] = useState(new Date())
@@ -23,20 +24,11 @@ export default function Sidebar({ currentView, setCurrentView, primaryColor, use
       try {
         const queryYear = heatmapDate.getFullYear()
         const queryMonth = heatmapDate.getMonth() + 1
-        // Updated URL to match backend endpoint: /api/v1/stats/heatmap
-        const url = `http://127.0.0.1:8000/api/v1/stats/heatmap?year=${queryYear}&month=${queryMonth}&user_id=${userId}`
-        console.log('Sidebar: Fetching heatmap', url)
+        console.log('Sidebar: Fetching heatmap', { queryYear, queryMonth, userId })
         
-        const response = await fetch(url)
-        console.log('Sidebar: Response status', response.status)
-        
-        if (response.ok) {
-          const data = await response.json()
-          console.log('Sidebar: Heatmap data received', data)
-          setHeatmapData(data)
-        } else {
-          console.error('Sidebar: Failed to fetch heatmap', response.statusText)
-        }
+        const data = await getHeatmapData(queryYear, queryMonth, userId)
+        console.log('Sidebar: Heatmap data received', data)
+        setHeatmapData(data)
       } catch (error) {
         console.error("Sidebar: Error fetching heatmap data", error)
       }
