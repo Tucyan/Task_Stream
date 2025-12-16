@@ -255,6 +255,15 @@ export default function AiAssistantView() {
                     
                     if (!isDuplicate) {
                         lastMsg.content.push({ type: 'card', data: card });
+                        
+                        // Check for auto-confirmed actions (or actions confirmed by backend immediately)
+                        if (card.user_confirmation === 'Y') {
+                            if ([1, 2, 3, 4].includes(card.type)) {
+                                taskEventBus.emit('task-updated');
+                            } else if (card.type === 7) {
+                                taskEventBus.emit('journal-updated');
+                            }
+                        }
                     }
                 });
             } else if (event === 'error') {
@@ -543,10 +552,10 @@ function CardItem({ card, userId }) {
                 // Update other views via EventBus
                 // Type 1: Create Task, 2: Delete Task, 3: Update Task, 4: Create Long Term
                 if ([1, 2, 3, 4].includes(type)) {
-                     taskEventBus.emit('taskUpdated');
+                     taskEventBus.emit('task-updated');
                 } else if (type === 7) {
                      // Type 7: Update Journal
-                     taskEventBus.emit('journalUpdated');
+                     taskEventBus.emit('journal-updated');
                 }
             } else {
                 await api.cancelAiAction(action_id, userId);

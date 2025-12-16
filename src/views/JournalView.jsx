@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import * as api from '../services/api.js'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import taskEventBus from '../utils/eventBus.js'
 
 export default function JournalView({ userId }) {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -10,6 +11,7 @@ export default function JournalView({ userId }) {
   const [journalStatus, setJournalStatus] = useState([])
   const [isPreview, setIsPreview] = useState(false)
   const [isCalendarOpen, setIsCalendarOpen] = useState(false) // Mobile calendar toggle state
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -27,7 +29,7 @@ export default function JournalView({ userId }) {
         })
         .catch(console.error);
     }
-  }, [year, month, userId]);
+  }, [year, month, userId, refreshKey]);
 
   useEffect(() => {
     // Construct date string YYYY-MM-DD
@@ -39,7 +41,17 @@ export default function JournalView({ userId }) {
         setIsPreview(!!(data && data.content));
       })
       .catch(console.error);
-  }, [year, month, selectedDay, userId]);
+  }, [year, month, selectedDay, userId, refreshKey]);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+        setRefreshKey(prev => prev + 1);
+    }
+    taskEventBus.on('journal-updated', handleUpdate);
+    return () => {
+        taskEventBus.off('journal-updated', handleUpdate);
+    }
+  }, []);
 
   const saveJournal = () => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;

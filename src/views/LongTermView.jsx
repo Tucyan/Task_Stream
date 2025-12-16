@@ -53,6 +53,14 @@ export default function LongTermView({ userId, onTaskUpdate }) {
       fetchTasks();
   }, [userId]);
 
+  useEffect(() => {
+      const handleUpdate = () => fetchTasks();
+      taskEventBus.on('task-updated', handleUpdate);
+      return () => {
+          taskEventBus.off('task-updated', handleUpdate);
+      };
+  }, [userId]);
+
   const baseFilteredTasks = useMemo(() => {
     return longTermTasks.filter(task => {
       // 1. Search Filter
