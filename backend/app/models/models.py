@@ -65,6 +65,23 @@ class AIAssistantMessage(Base):
     timestamp = Column(String, nullable=False)
     messages = Column(Text, nullable=False)
 
+class AIConfig(Base):
+    __tablename__ = "ai_configs"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    api_key = Column(Text, nullable=False)
+    model = Column(Text, nullable=False)
+    prompt = Column(Text, nullable=True)
+    character = Column(Text, nullable=True)
+    long_term_memory = Column(Text, nullable=True)
+    ai_dialogue_id_list = Column(Text, nullable=True)
+    is_enable_prompt = Column(Integer, nullable=False, default=0)
+    is_auto_confirm_create_request = Column(Integer, nullable=False, default=0)
+    is_auto_confirm_update_request = Column(Integer, nullable=False, default=0)
+    is_auto_confirm_delete_request = Column(Integer, nullable=False, default=0)
+    is_auto_confirm_create_reminder = Column(Integer, nullable=False, default=0)
+    reminder_list = Column(Text, nullable=True)
+
 class Settings(Base):
     __tablename__ = "settings"
     id = Column(Integer, primary_key=True, index=True)

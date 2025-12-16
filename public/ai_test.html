@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 功能极简测试</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; position: relative; }
+        .box { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+        #chat-history { height: 400px; overflow-y: auto; border: 1px solid #eee; padding: 10px; background: #f9f9f9; }
+        .message { margin-bottom: 10px; padding: 8px; border-radius: 4px; }
+        .user { background: #e3f2fd; text-align: right; }
+        .assistant { background: #fff; border: 1px solid #ddd; }
+        .card { border: 1px dashed #ff9800; background: #fff3e0; padding: 5px; margin-top: 5px; font-size: 0.9em; }
+        .controls { display: flex; gap: 10px; margin-top: 10px; }
+        input { flex: 1; padding: 8px; }
+        button { padding: 8px 15px; cursor: pointer; }
+        
+        /* Modal Styles */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .modal-body .form-group { margin-bottom: 15px; }
+        .modal-body label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .modal-body input[type="text"], .modal-body textarea, .modal-body select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .modal-body textarea { height: 80px; resize: vertical; }
+        .modal-body .checkbox-group { display: flex; align-items: center; gap: 10px; }
+        .modal-body .checkbox-group input { width: auto; flex: 0; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <button onclick="openSettingsModal()" style="position: absolute; top: 20px; right: 20px;">⚙️ 设置</button>
+    <h1>AI 助手测试台</h1>
+    
+    <div class="box">
+        <h3>1. 配置</h3>
+        <label>User ID: <input type="number" id="userId" value="1"></label>
+        <button onclick="loadConfig()">加载配置</button>
+        <button onclick="createDialogue()">新建对话</button>
+        <button onclick="simulateCards()">测试卡片显示</button>
+        
+        <div style="margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px;">
+            <label>输入对话ID: <input type="number" id="inputDialogueId" placeholder="例如: 12"></label>
+            <button onclick="enterDialogue()">进入对话</button>
+        </div>
+        
+        <div style="margin-top: 5px;">
+            <span id="dialogueInfo">当前对话ID: -</span>
+        </div>
+    </div>
+
+    <div class="box">
+        <h3>2. 对话</h3>
+        <div id="chat-history"></div>
+        <div class="controls">
+            <input type="text" id="userInput" placeholder="输入你的问题，例如：帮我创建一个明天上午9点的背单词任务">
+            <button onclick="sendMessage()">发送</button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>AI 设置</h3>
+                <button onclick="closeSettingsModal()" style="background:none; border:none; font-size:1.5em; padding:0; cursor:pointer;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>API Key:</label>
+                    <input type="text" id="cfg_api_key" placeholder="sk-...">
+                </div>
+                <div class="form-group">
+                    <label>Model:</label>
+                    <input type="text" id="cfg_model" placeholder="例如: qwen-flash">
+                </div>
+                <div class="form-group">
+                    <label>System Prompt:</label>
+                    <textarea id="cfg_prompt" placeholder="系统提示词"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Character (人设):</label>
+                    <select id="cfg_character">
+                        <option value="默认">默认</option>
+                        <option value="温柔">温柔</option>
+                        <option value="正式">正式</option>
+                        <option value="幽默">幽默</option>
+                        <option value="严厉">严厉</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Long Term Memory (长期记忆):</label>
+                    <textarea id="cfg_long_term_memory" placeholder="长期记忆内容"></textarea>
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="cfg_is_enable_prompt">
+                    <label for="cfg_is_enable_prompt">启用 Prompt</label>
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="cfg_auto_create">
+                    <label for="cfg_auto_create">自动确认创建请求</label>
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="cfg_auto_update">
+                    <label for="cfg_auto_update">自动确认更新请求</label>
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="cfg_auto_delete">
+                    <label for="cfg_auto_delete">自动确认删除请求</label>
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="cfg_auto_reminder">
+                    <label for="cfg_auto_reminder">自动确认提醒请求</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeSettingsModal()" style="background:#eee; color:#333;">取消</button>
+                <button onclick="saveSettings()" style="background:#4CAF50; color:white;">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Modal Logic
+        async function openSettingsModal() {
+            const uid = document.getElementById('userId').value;
+            const modal = document.getElementById('settingsModal');
+            
+            // Show loading state or fetch data
+            try {
+                const res = await fetch(`${API_BASE}/ai/config/${uid}`);
+                if (!res.ok) throw new Error("无法获取配置");
+                const data = await res.json();
+                
+                // Populate form
+                document.getElementById('cfg_api_key').value = data.api_key || '';
+                document.getElementById('cfg_model').value = data.model || '';
+                document.getElementById('cfg_prompt').value = data.prompt || '';
+                document.getElementById('cfg_character').value = data.character || '';
+                document.getElementById('cfg_long_term_memory').value = data.long_term_memory || '';
+                
+                document.getElementById('cfg_is_enable_prompt').checked = data.is_enable_prompt === 1;
+                document.getElementById('cfg_auto_create').checked = data.is_auto_confirm_create_request === 1;
+                document.getElementById('cfg_auto_update').checked = data.is_auto_confirm_update_request === 1;
+                document.getElementById('cfg_auto_delete').checked = data.is_auto_confirm_delete_request === 1;
+                document.getElementById('cfg_auto_reminder').checked = data.is_auto_confirm_create_reminder === 1;
+                
+                modal.style.display = 'block';
+            } catch (e) {
+                alert("加载设置失败: " + e);
+            }
+        }
+        
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+        
+        async function saveSettings() {
+            const uid = document.getElementById('userId').value;
+            
+            const payload = {
+                api_key: document.getElementById('cfg_api_key').value,
+                model: document.getElementById('cfg_model').value,
+                prompt: document.getElementById('cfg_prompt').value,
+                character: document.getElementById('cfg_character').value,
+                long_term_memory: document.getElementById('cfg_long_term_memory').value,
+                is_enable_prompt: document.getElementById('cfg_is_enable_prompt').checked ? 1 : 0,
+                is_auto_confirm_create_request: document.getElementById('cfg_auto_create').checked ? 1 : 0,
+                is_auto_confirm_update_request: document.getElementById('cfg_auto_update').checked ? 1 : 0,
+                is_auto_confirm_delete_request: document.getElementById('cfg_auto_delete').checked ? 1 : 0,
+                is_auto_confirm_create_reminder: document.getElementById('cfg_auto_reminder').checked ? 1 : 0
+            };
+            
+            try {
+                const res = await fetch(`${API_BASE}/ai/config/${uid}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) throw new Error("保存失败");
+                
+                const data = await res.json();
+                alert("设置保存成功!");
+                closeSettingsModal();
+            } catch (e) {
+                alert("保存失败: " + e);
+            }
+        }
+
+        let currentDialogueId = null;
+        const API_BASE = "http://localhost:8000/api/v1";
+
+        async function loadConfig() {
+            const uid = document.getElementById('userId').value;
+            try {
+                const res = await fetch(`${API_BASE}/ai/config/${uid}`);
+                const data = await res.json();
+                alert("配置加载成功: " + JSON.stringify(data));
+            } catch (e) {
+                alert("加载配置失败: " + e);
+            }
+        }
+
+        async function createDialogue() {
+            const uid = document.getElementById('userId').value;
+            try {
+                const res = await fetch(`${API_BASE}/ai/dialogues`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: parseInt(uid), title: "测试对话 " + new Date().toLocaleTimeString() })
+                });
+                const data = await res.json();
+                currentDialogueId = data.id;
+                document.getElementById('dialogueInfo').textContent = "当前对话ID: " + currentDialogueId;
+                
+                // 清空并提示
+                document.getElementById('chat-history').innerHTML = '';
+                addMessage('system', `对话已创建 (ID: ${currentDialogueId})`);
+            } catch (e) {
+                alert("创建对话失败: " + e);
+            }
+        }
+
+        async function enterDialogue() {
+            const uid = document.getElementById('userId').value;
+            const didInput = document.getElementById('inputDialogueId').value;
+            
+            if (!didInput) {
+                alert("请输入对话ID");
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/ai/dialogues/${didInput}?user_id=${uid}`);
+                if (!res.ok) throw new Error("对话不存在或无法访问");
+                
+                const data = await res.json();
+                currentDialogueId = data.id;
+                document.getElementById('dialogueInfo').textContent = "当前对话ID: " + currentDialogueId;
+                
+                // 清空现有消息
+                document.getElementById('chat-history').innerHTML = '';
+                addMessage('system', `已进入对话 (ID: ${currentDialogueId}) - ${data.title || '无标题'}`);
+                
+                // 加载历史消息
+                if (data.messages && Array.isArray(data.messages)) {
+                    data.messages.forEach(turn => {
+                        // turn 是一个列表 [user_msg, assistant_msg]
+                        if (Array.isArray(turn)) {
+                            turn.forEach(msg => {
+                                if (msg.role === 'user') {
+                                    addMessage('user', msg.content);
+                                } else if (msg.role === 'assistant') {
+                                    const msgDiv = addMessage('assistant', '');
+                                    // 渲染 assistant 内容（可能是字符串或数组）
+                                    renderAssistantContent(msg.content, msgDiv);
+                                }
+                            });
+                        }
+                    });
+                }
+                
+            } catch (e) {
+                alert("进入对话失败: " + e);
+            }
+        }
+        
+        function renderAssistantContent(content, msgDiv) {
+            if (typeof content === 'string') {
+                // 简单文本
+                handleEvent('partial_text', { content: content }, msgDiv);
+            } else if (Array.isArray(content)) {
+                // 混合内容 [{"type": 0, "data":...}, {"type": 1, ...}]
+                // 复用 handleEvent 的逻辑，模拟事件流
+                content.forEach(item => {
+                    if (item.type === 0) {
+                        handleEvent('partial_text', { content: item.data.content }, msgDiv);
+                    } else {
+                        handleEvent('cards', { cards: [item] }, msgDiv);
+                    }
+                });
+            }
+        }
+
+        async function sendMessage() {
+            const uid = document.getElementById('userId').value;
+            const text = document.getElementById('userInput').value;
+            if (!text || !currentDialogueId) {
+                alert("请先创建对话并输入内容");
+                return;
+            }
+
+            addMessage('user', text);
+            document.getElementById('userInput').value = '';
+
+            // 建立 SSE 连接
+            // 注意：fetchEventSource 是更好的选择，但原生 EventSource 只能用 GET。
+            // 我们的后端接口是 POST。
+            // 所以我们需要用 fetch-event-source 库，或者后端改为 GET。
+            // 但后端目前是 POST。
+            // 为了极简测试，这里我们手写一个简单的 fetch reader 模拟 SSE 客户端，
+            // 或者引入微软的 fetch-event-source 库。
+            // 简单的 fetch stream reader:
+            
+            try {
+                const response = await fetch(`${API_BASE}/ai/dialogues/${currentDialogueId}/messages/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: parseInt(uid),
+                        content: text
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let assistantMsgDiv = addMessage('assistant', '');
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    // SSE 格式通常是 "event: ...\ndata: ...\n\n"
+                    // 这里简单解析
+                    const lines = (buffer + chunk).split('\n');
+                    buffer = lines.pop(); // 保留最后不完整的一行
+
+                    let currentEvent = null;
+
+                    for (const line of lines) {
+                        if (line.startsWith('event: ')) {
+                            currentEvent = line.substring(7).trim();
+                        } else if (line.startsWith('data: ')) {
+                            const dataStr = line.substring(6).trim();
+                            if (!dataStr) continue;
+                            
+                            try {
+                                const data = JSON.parse(dataStr);
+                                handleEvent(currentEvent, data, assistantMsgDiv);
+                            } catch (e) {
+                                console.error("Parse error", e);
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+                addMessage('system', 'Error: ' + e);
+            }
+        }
+
+        function handleEvent(event, data, msgDiv) {
+            // 在 interleaved 模式下，不需要每次都清空或重置，直接追加即可
+            // 因为后端已经保证了 text 和 card 的发送顺序
+            
+            if (event === 'partial_text') {
+                // 简单的文本追加
+                // 为了避免卡片出现在文本中间导致的显示混乱，
+                // 我们每次收到 partial_text 都追加到一个当前的文本节点中。
+                // 如果上一个节点是卡片，则新建一个文本节点。
+                
+                // 使用 dataset 跟踪最后一个元素的类型，比检查 lastElementChild 更可靠
+                const lastType = msgDiv.dataset.lastElementType;
+                
+                let textContainer;
+                if (!lastType || lastType === 'card') {
+                    textContainer = document.createElement('div');
+                    textContainer.className = 'content';
+                    textContainer.style.whiteSpace = 'pre-wrap'; // 保留换行
+                    msgDiv.appendChild(textContainer);
+                    msgDiv.dataset.lastElementType = 'text';
+                } else {
+                    textContainer = msgDiv.lastElementChild;
+                }
+                
+                // data.delta 是增量，data.content 是全量（在某些实现中）
+                // 我们的后端 OutputManager 现在的 stream_text 里的 data.content 其实是 delta
+                // 但为了保险，我们优先用 delta
+                const textContent = data.delta !== undefined ? data.delta : data.content;
+                textContainer.textContent += textContent || ""; 
+                
+            } else if (event === 'cards') {
+                const cards = data.cards;
+                cards.forEach(card => {
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = 'card';
+                    
+                    // Render based on card type
+                    let contentHtml = '';
+                    const d = card.data;
+                    
+                    if (card.type === 1) { // Create Task
+                        contentHtml = `
+                            <div style="border-left: 3px solid #4CAF50; padding-left: 10px;">
+                                <h4 style="margin: 0 0 5px 0; color: #2E7D32;">🆕 创建任务</h4>
+                                <div><strong>标题:</strong> ${d.title}</div>
+                                ${d.description ? `<div><strong>描述:</strong> ${d.description}</div>` : ''}
+                                ${d.due_date ? `<div><strong>截止:</strong> ${d.due_date}</div>` : ''}
+                                ${d.assigned_date ? `<div><strong>分配日期:</strong> ${d.assigned_date}</div>` : ''}
+                                ${d.assigned_start_time ? `<div><strong>时间:</strong> ${d.assigned_start_time} - ${d.assigned_end_time || ''}</div>` : ''}
+                                ${d.tags && d.tags.length ? `<div><strong>标签:</strong> ${d.tags.join(', ')}</div>` : ''}
+                                ${d.record_result ? `<div><strong>需记录结果:</strong> 是</div>` : ''}
+                                ${d.result ? `<div><strong>结果:</strong> ${d.result}</div>` : ''}
+                                ${d.long_term_task_id ? `<div><strong>关联长期任务ID:</strong> ${d.long_term_task_id}</div>` : ''}
+                            </div>`;
+                    } else if (card.type === 2) { // Delete / Confirm
+                        contentHtml = `
+                            <div style="border-left: 3px solid #F44336; padding-left: 10px;">
+                                <h4 style="margin: 0 0 5px 0; color: #C62828;">⚠️ 确认删除</h4>
+                                <div><strong>${d.title}</strong></div>
+                                <div>${d.description}</div>
+                                ${d.task_id ? `<div><strong>任务ID:</strong> ${d.task_id}</div>` : ''}
+                            </div>`;
+                    } else if (card.type === 3) { // Update Task
+                        let diffHtml = '';
+                        const formatVal = (key, val) => {
+                            if (key === 'status') return val === 1 ? '待办' : (val === 3 ? '完成' : val);
+                            if (val === null || val === undefined) return '(空)';
+                            if (typeof val === 'object') return JSON.stringify(val);
+                            return val;
+                        };
+                        
+                        // Compare original and updated
+                        for (let key in d.updated) {
+                            if (key === 'id' || key === 'user_id' || key === 'created_at' || key === 'updated_at') continue; // Skip metadata
+                            const oldVal = d.original[key];
+                            const newVal = d.updated[key];
+                            
+                            // Simple equality check (works for primitives and simple lists if stringified match)
+                            if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+                                diffHtml += `
+                                    <div style="margin-top: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                                        <div style="font-weight: bold; color: #555; font-size: 0.9em;">${key}</div>
+                                        <div style="display: flex; gap: 10px;">
+                                            <div style="flex: 1; color: #d32f2f; background: #ffebee; padding: 2px; font-size: 0.9em;"><span style="user-select:none">- </span>${formatVal(key, oldVal)}</div>
+                                            <div style="flex: 1; color: #388e3c; background: #e8f5e9; padding: 2px; font-size: 0.9em;"><span style="user-select:none">+ </span>${formatVal(key, newVal)}</div>
+                                        </div>
+                                    </div>`;
+                            }
+                        }
+                        
+                        if (!diffHtml) diffHtml = '<div>没有检测到变更</div>';
+
+                        contentHtml = `
+                            <div style="border-left: 3px solid #2196F3; padding-left: 10px;">
+                                <h4 style="margin: 0 0 5px 0; color: #1565C0;">📝 更新任务</h4>
+                                <div><strong>ID:</strong> ${d.original.id}</div>
+                                <div style="margin-top: 5px;">
+                                    ${diffHtml}
+                                </div>
+                            </div>`;
+                    } else if (card.type === 4) { // Create Long Term Task
+                        contentHtml = `
+                            <div style="border-left: 3px solid #9C27B0; padding-left: 10px;">
+                                <h4 style="margin: 0 0 5px 0; color: #7B1FA2;">🚀 创建长期任务</h4>
+                                <div><strong>标题:</strong> ${d.title}</div>
+                                ${d.description ? `<div><strong>描述:</strong> ${d.description}</div>` : ''}
+                                ${d.start_date ? `<div><strong>开始日期:</strong> ${d.start_date}</div>` : ''}
+                                ${d.due_date ? `<div><strong>截止日期:</strong> ${d.due_date}</div>` : ''}
+                                ${d.progress !== undefined ? `<div><strong>进度:</strong> ${(d.progress * 100).toFixed(0)}%</div>` : ''}
+                                ${d.sub_task_ids ? `<div><strong>子任务:</strong> <pre>${JSON.stringify(d.sub_task_ids, null, 2)}</pre></div>` : ''}
+                            </div>`;
+                    } else if (card.type === 7) { // Update Journal
+                        contentHtml = `
+                            <div style="border-left: 3px solid #FF9800; padding-left: 10px;">
+                                <h4 style="margin: 0 0 5px 0; color: #EF6C00;">📔 更新日记</h4>
+                                <div><strong>日期:</strong> ${d.before.date}</div>
+                                <div style="display: flex; gap: 10px; margin-top: 5px;">
+                                    <div style="flex: 1; background: #fff3e0; padding: 5px;">
+                                        <div style="font-size: 0.8em; color: #666;">修改前</div>
+                                        <div style="white-space: pre-wrap;">${d.before.content || '(空)'}</div>
+                                    </div>
+                                    <div style="flex: 1; background: #fff8e1; padding: 5px;">
+                                        <div style="font-size: 0.8em; color: #666;">修改后</div>
+                                        <div style="white-space: pre-wrap;">${d.after.content}</div>
+                                    </div>
+                                </div>
+                            </div>`;
+                    } else {
+                        // Generic Fallback
+                        contentHtml = `<strong>卡片 (Type ${card.type})</strong><br><pre>${JSON.stringify(card.data, null, 2)}</pre>`;
+                    }
+                    
+                    cardDiv.innerHTML = contentHtml;
+                    
+                    if (card.user_confirmation) {
+                        const statusDiv = document.createElement('div');
+                        statusDiv.style.marginTop = "5px";
+                        statusDiv.style.fontWeight = "bold";
+                        if (card.user_confirmation === 'Y') {
+                            statusDiv.style.color = "green";
+                            statusDiv.textContent = "已确认 (Y)";
+                        } else {
+                            statusDiv.style.color = "red";
+                            statusDiv.textContent = "已取消 (N)";
+                        }
+                        cardDiv.appendChild(statusDiv);
+                    } else if (card.action_id) {
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.style.marginTop = "5px";
+
+                        const btnConfirm = document.createElement('button');
+                        btnConfirm.textContent = "✅ 确认";
+                        btnConfirm.onclick = () => confirmAction(card.action_id, actionsDiv);
+                        
+                        const btnCancel = document.createElement('button');
+                        btnCancel.textContent = "❌ 取消";
+                        btnCancel.onclick = () => cancelAction(card.action_id, actionsDiv);
+                        
+                        actionsDiv.appendChild(btnConfirm);
+                        actionsDiv.appendChild(btnCancel);
+                        cardDiv.appendChild(actionsDiv);
+                    }
+                    
+                    msgDiv.appendChild(cardDiv);
+                });
+                msgDiv.dataset.lastElementType = 'card';
+            } else if (event === 'error') {
+                msgDiv.innerHTML += `<br><span style="color:red">Error: ${data.message}</span>`;
+            }
+            
+            // 滚动到底部
+            const history = document.getElementById('chat-history');
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function addMessage(role, text) {
+            const history = document.getElementById('chat-history');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            if (role === 'user') div.textContent = text;
+            if (role === 'system') div.innerHTML = `<i>${text}</i>`;
+            history.appendChild(div);
+            history.scrollTop = history.scrollHeight;
+            return div;
+        }
+
+        async function confirmAction(actionId, container) {
+            if(container) container.innerHTML = "⏳ 确认中...";
+            try {
+                await fetch(`${API_BASE}/ai/actions/${actionId}/confirm`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: 1 })
+                });
+                if(container) {
+                    container.innerHTML = '<span style="color: green; font-weight: bold;">已确认 (Y)</span>';
+                } else {
+                    alert("已确认");
+                }
+            } catch (e) { 
+                alert(e); 
+                if(container) container.innerHTML = "❌ 失败";
+            }
+        }
+
+        async function cancelAction(actionId, container) {
+            if(container) container.innerHTML = "⏳ 取消中...";
+            try {
+                await fetch(`${API_BASE}/ai/actions/${actionId}/cancel`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: 1 })
+                });
+                if(container) {
+                    container.innerHTML = '<span style="color: red; font-weight: bold;">已取消 (N)</span>';
+                } else {
+                    alert("已取消");
+                }
+            } catch (e) { 
+                alert(e); 
+                if(container) container.innerHTML = "❌ 失败";
+            }
+        }
+
+        function simulateCards() {
+            const msgDiv = addMessage('assistant', '');
+            
+            // 1. Create Task
+            handleEvent('partial_text', { content: "好的，我来帮你创建任务。\n" }, msgDiv);
+            handleEvent('cards', { cards: [{
+                type: 1,
+                data: { 
+                    title: "买牛奶", 
+                    description: "去超市买全脂牛奶", 
+                    due_date: "2023-12-31",
+                    tags: ["生活", "购物"],
+                    record_result: true
+                },
+                action_id: "sim-1",
+                user_confirmation: "Y"
+            }]}, msgDiv);
+            
+            // 2. Delete Task
+            handleEvent('partial_text', { content: "\n接下来删除旧任务。\n" }, msgDiv);
+            handleEvent('cards', { cards: [{
+                type: 2,
+                data: { title: "确认删除任务: 买鸡蛋", description: "ID: 101", task_id: 101 },
+                action_id: "sim-2",
+                user_confirmation: "N"
+            }]}, msgDiv);
+            
+            // 3. Update Task
+            handleEvent('partial_text', { content: "\n然后更新一下会议时间。\n" }, msgDiv);
+            handleEvent('cards', { cards: [{
+                type: 3,
+                data: { 
+                    original: { id: 102, title: "周会", status: 1, due_date: "2023-10-27 10:00" },
+                    updated: { id: 102, title: "周会 (改期)", status: 3, due_date: "2023-10-28 10:00" }
+                },
+                action_id: "sim-3"
+            }]}, msgDiv);
+            
+            // 4. Create Long Term Task
+            handleEvent('partial_text', { content: "\n创建一个长期学习计划。\n" }, msgDiv);
+            handleEvent('cards', { cards: [{
+                type: 4,
+                data: { 
+                    title: "学习钢琴", 
+                    description: "从零开始学习",
+                    start_date: "2023-11-01",
+                    progress: 0.0,
+                    sub_task_ids: {"103": 0.5, "104": 0.5} 
+                },
+                action_id: "sim-4"
+            }]}, msgDiv);
+            
+            // 7. Update Journal
+            handleEvent('partial_text', { content: "\n最后更新今天的日记。\n" }, msgDiv);
+            handleEvent('cards', { cards: [{
+                type: 7,
+                data: { 
+                    before: { date: "2023-10-27", content: "今天天气不错。" },
+                    after: { date: "2023-10-27", content: "今天天气不错，还去公园跑了步。" }
+                },
+                action_id: "sim-7"
+            }]}, msgDiv);
+            
+            handleEvent('partial_text', { content: "\n演示完毕。" }, msgDiv);
+        }
+    </script>
+</body>
+</html>

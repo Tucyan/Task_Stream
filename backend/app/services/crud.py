@@ -270,6 +270,14 @@ def update_long_term_task(task_id: int, updated_task: schemas.LongTermTask, db: 
     
     return True
 
+def get_journals_in_date_range(start_date: str, end_date: str, user_id: int, db: Session) -> List[schemas.Journal]:
+    journals = db.query(models.Journal).filter(
+        models.Journal.user_id == user_id,
+        models.Journal.date >= start_date,
+        models.Journal.date <= end_date
+    ).order_by(models.Journal.date).all()
+    return [schemas.Journal(date=j.date, user_id=j.user_id, content=j.content) for j in journals]
+
 def get_journal_by_date(date: str, user_id: int, db: Session) -> Optional[schemas.Journal]:
     journal = db.query(models.Journal).filter(models.Journal.date == date, models.Journal.user_id == user_id).first()
     if journal:

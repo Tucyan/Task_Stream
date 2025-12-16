@@ -86,7 +86,7 @@ class AiMessage(BaseModel):
     user_id: int
     title: Optional[str]
     timestamp: str
-    messages: List[Dict[str, Any]]
+    messages: List[List[Dict[str, Any]]]
 
     class Config:
         from_attributes = True
@@ -112,5 +112,43 @@ class SettingsUpdate(BaseModel):
 class Settings(SettingsBase):
     id: int
     
+    class Config:
+        from_attributes = True
+
+class AIConfigBase(BaseModel):
+    user_id: int
+    api_key: str
+    model: str
+    prompt: Optional[str] = None
+    character: Optional[str] = None
+    long_term_memory: Optional[str] = None
+    # 这里的 list 在 DB 是 Text，但在 API 交互中最好是 List。
+    # 为了简化，我们先假设 CRUD 层处理好序列化，或者直接透传 JSON string，
+    # 但根据文档，前端拿到的是对象。所以这里用 List，CRUD 负责转换。
+    ai_dialogue_id_list: Optional[List[int]] = []
+    is_enable_prompt: int = 0
+    is_auto_confirm_create_request: int = 0
+    is_auto_confirm_update_request: int = 0
+    is_auto_confirm_delete_request: int = 0
+    is_auto_confirm_create_reminder: int = 0
+    reminder_list: Optional[List[Dict[str, Any]]] = []
+
+class AIConfigCreate(AIConfigBase):
+    pass
+
+class AIConfigUpdate(BaseModel):
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+    prompt: Optional[str] = None
+    character: Optional[str] = None
+    long_term_memory: Optional[str] = None
+    is_enable_prompt: Optional[int] = None
+    is_auto_confirm_create_request: Optional[int] = None
+    is_auto_confirm_update_request: Optional[int] = None
+    is_auto_confirm_delete_request: Optional[int] = None
+    is_auto_confirm_create_reminder: Optional[int] = None
+
+class AIConfig(AIConfigBase):
+    id: int
     class Config:
         from_attributes = True

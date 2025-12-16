@@ -138,7 +138,7 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
               <i className="fa-solid fa-plus"></i>
             </button>
           </div>
-          <div className="flex-1 overflow-y-visible md:overflow-y-auto space-y-3 pr-2">
+          <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
             {todayTasks.map((task, index) => (
               <div key={index} className="group flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-white/5 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all cursor-pointer">
                 <div onClick={() => onToggleTask(index)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors ${task.completed ? 'bg-primary border-primary' : 'border-gray-300 dark:border-gray-600'}`}>

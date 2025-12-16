@@ -330,6 +330,9 @@ def update_memo(
 # 注册认证路由，前缀 /api/v1/auth
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 
+from app.api import ai
+app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
+
 # ------------------------------ 应用启动入口 ------------------------------
 # 如果直接运行该脚本，启动UVicorn服务器
 if __name__ == "__main__":

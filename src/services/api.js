@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 //这里导入了服务器的公网ip
 import sha256 from 'js-sha256';
 
@@ -198,6 +198,106 @@ export async function createLongTermTask(taskData) {
         method: 'POST',
         body: JSON.stringify(taskData),
     });
+}
+
+// --- AI API ---
+
+/**
+ * 获取用户 AI 配置
+ * @param {number} userId 
+ */
+export async function getAiConfig(userId) {
+    return request(`/api/v1/ai/config/${userId}`);
+}
+
+/**
+ * 更新用户 AI 配置
+ * @param {number} userId 
+ * @param {object} config 
+ */
+export async function updateAiConfig(userId, config) {
+    return request(`/api/v1/ai/config/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify(config)
+    });
+}
+
+/**
+ * 获取用户对话列表
+ * @param {number} userId 
+ */
+export async function getDialogues(userId) {
+    return request(`/api/v1/ai/dialogues?user_id=${userId}`);
+}
+
+/**
+ * 获取单个对话详情（历史记录）
+ * @param {number} dialogueId 
+ * @param {number} userId 
+ */
+export async function getDialogue(dialogueId, userId) {
+    return request(`/api/v1/ai/dialogues/${dialogueId}?user_id=${userId}`);
+}
+
+/**
+ * 创建新对话
+ * @param {number} userId 
+ * @param {string} title 
+ */
+export async function createDialogue(userId, title) {
+    return request('/api/v1/ai/dialogues', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, title: title })
+    });
+}
+
+/**
+ * 删除对话
+ * @param {number} dialogueId 
+ * @param {number} userId 
+ */
+export async function deleteDialogue(dialogueId, userId) {
+    return request(`/api/v1/ai/dialogues/${dialogueId}?user_id=${userId}`, {
+        method: 'DELETE'
+    });
+}
+
+/**
+ * 确认 Action
+ * @param {string} actionId 
+ * @param {number} userId 
+ */
+export async function confirmAiAction(actionId, userId) {
+    return request(`/api/v1/ai/actions/${actionId}/confirm`, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId })
+    });
+}
+
+/**
+ * 取消 Action
+ * @param {string} actionId 
+ * @param {number} userId 
+ */
+export async function cancelAiAction(actionId, userId) {
+    return request(`/api/v1/ai/actions/${actionId}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId })
+    });
+}
+
+/**
+ * 发送消息并获取流式响应的 URL (用于 fetch 调用)
+ * 注意：这里只返回 URL 和 fetch options，因为流式处理需要在组件中进行
+ */
+export function getChatStreamOptions(dialogueId, userId, content) {
+    return {
+        url: `/api/v1/ai/dialogues/${dialogueId}/messages/stream`,
+        options: {
+            method: 'POST',
+            body: JSON.stringify({ user_id: userId, content: content })
+        }
+    };
 }
 
 /**

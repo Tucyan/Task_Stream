@@ -1,45 +1,112 @@
-# 任务流管理系统 (Task Stream Management System)（AI写的）
+# 任务流管理系统 (Task Stream Management System)
 
 一个现代化的任务流管理应用，结合了前端React界面和后端FastAPI服务，提供全面的任务管理、AI助手和长期任务跟踪功能。
 
 ## ✨ 功能特性
 
 ### 📋 任务管理
-- **任务创建与编辑**：支持创建、编辑和删除任务
+- **任务创建与编辑**：支持创建、编辑和删除短期任务
+- **长期任务管理**：创建和跟踪长期项目
 - **子任务管理**：将复杂任务分解为可管理的小任务
 - **实时状态更新**：任务状态变化实时反映在界面上
 
 ### 🤖 AI助手集成
-  ## 没做呢
+- **实时对话**：与AI助手进行实时流式对话
+- **自定义配置**：支持配置API密钥和模型选择
+- **对话历史管理**：保存和管理对话历史
+- **智能响应**：基于用户输入生成智能响应
 
-### 📈 长期任务跟踪
-- **项目概览**：查看长期项目进度
-- **里程碑管理**：设置和跟踪关键里程碑
+### 📔 日记功能
+- **日期视图**：查看指定月份的日记记录
+- **内容编辑**：支持富文本编辑日记内容
+- **状态跟踪**：记录每日日记完成情况
 
 ### 📊 数据可视化
 - **热力图视图**：可视化任务分布和完成情况
 - **进度报告**：生成详细的项目进度报告
 - **统计仪表板**：实时查看任务统计数据
 
+### 🔐 用户认证
+- **注册登录**：安全的用户注册和登录系统
+- **个人设置**：自定义用户偏好设置
+- **备忘录功能**：保存个人备忘录
 
 ## 🛠️ 技术栈
 
 ### 前端
-- **React 18** - 现代化前端框架
+- **React 19** - 现代化前端框架
 - **Vite** - 快速构建工具
 - **CSS3** - 现代样式方案
 - **ESLint** - 代码质量检查
+- **React Markdown** - Markdown渲染
 
 ### 后端
 - **FastAPI** - 高性能Python Web框架
 - **SQLAlchemy** - ORM数据库操作
 - **SQLite** - 轻量级数据库
 - **Pydantic** - 数据验证和序列化
+- **SSE-Starlette** - 服务器发送事件支持
 
 ### 开发工具
 - **Python 3.11+** - 后端运行环境
 - **Node.js 18+** - 前端构建环境
 - **Git** - 版本控制
+
+## 📁 项目结构
+
+```
+task-stream/
+├── src/                          # React前端源代码
+│   ├── components/               # 可复用组件
+│   │   ├── AuthModal.jsx        # 认证模态框
+│   │   ├── HeaderBar.jsx        # 头部导航栏
+│   │   ├── TaskModal.jsx        # 任务编辑模态框
+│   │   ├── SubTaskManager.jsx   # 子任务管理器
+│   │   ├── SubtaskEditor.jsx    # 子任务编辑器
+│   │   ├── ResultModal.jsx      # 结果模态框
+│   │   ├── LongTermTaskModal.jsx # 长期任务模态框
+│   │   └── ...                  # 其他组件
+│   ├── views/                   # 页面视图
+│   │   ├── HomeView.jsx         # 主页视图
+│   │   ├── DetailView.jsx       # 详情视图
+│   │   ├── LongTermView.jsx     # 长期任务视图
+│   │   ├── AiAssistantView.jsx  # AI助手视图
+│   │   ├── JournalView.jsx      # 日记视图
+│   │   └── SettingsView.jsx     # 设置视图
+│   ├── services/                # API服务
+│   │   └── api.js               # API调用封装
+│   ├── utils/                   # 工具函数
+│   │   └── eventBus.js          # 事件总线
+│   ├── App.css                  # 应用样式
+│   ├── App.jsx                  # 主应用组件
+│   ├── index.css                # 全局样式
+│   └── main.jsx                 # 应用入口点
+├── backend/                     # FastAPI后端源代码
+│   ├── app/
+│   │   ├── api/                 # API路由
+│   │   │   └── ai.py            # AI相关API
+│   │   ├── core/                # 核心配置
+│   │   │   ├── database.py      # 数据库配置
+│   │   │   └── init_db.py       # 数据库初始化
+│   │   ├── models/              # 数据模型
+│   │   │   └── models.py        # SQLAlchemy模型
+│   │   ├── schemas/             # Pydantic模式
+│   │   │   └── schemas.py       # API模式定义
+│   │   ├── services/            # 业务逻辑
+│   │   │   ├── auth.py          # 认证服务
+│   │   │   ├── crud.py          # CRUD操作
+│   │   │   ├── ai_service.py    # AI服务
+│   │   │   ├── ai_config_service.py # AI配置服务
+│   │   │   └── ai_output_manager.py # AI输出管理
+│   │   └── main.py              # FastAPI应用入口
+│   └── requirements.txt         # Python依赖
+├── public/                      # 静态资源
+├── .gitignore                   # Git忽略规则
+├── package.json                 # Node.js依赖配置
+├── vite.config.js              # Vite构建配置
+├── eslint.config.js            # ESLint配置
+└── README.md                    # 项目文档
+```
 
 ## 🚀 快速开始
 
@@ -74,13 +141,7 @@ cd backend
 pip install -r requirements.txt
 ```
 
-3. **初始化数据库**
-```bash
-# 运行数据库初始化脚本
-python -m app.core.init_db
-```
-
-4. **启动后端服务**
+3. **启动后端服务**
 ```bash
 cd backend/app
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
@@ -103,49 +164,49 @@ npm run dev
 
 前端应用将在 http://localhost:5173 启动
 
-## 📁 项目结构
+## 📖 API文档
 
-```
-task-stream/
-├── src/                          # React前端源代码
-│   ├── components/               # 可复用组件
-│   │   ├── AuthModal.jsx        # 认证模态框
-│   │   ├── HeaderBar.jsx        # 头部导航栏
-│   │   ├── TaskModal.jsx        # 任务编辑模态框
-│   │   ├── SubTaskManager.jsx   # 子任务管理器
-│   │   └── ...                  # 其他组件
-│   ├── views/                   # 页面视图
-│   │   ├── HomeView.jsx         # 主页视图
-│   │   ├── DetailView.jsx       # 详情视图
-│   │   ├── LongTermView.jsx     # 长期任务视图
-│   │   └── ...                  # 其他视图
-│   ├── services/                # API服务
-│   │   └── api.js               # API调用封装
-│   ├── utils/                   # 工具函数
-│   │   └── eventBus.js          # 事件总线
-│   ├── App.jsx                  # 主应用组件
-│   └── main.jsx                 # 应用入口点
-├── backend/                     # FastAPI后端源代码
-│   └── app/
-│       ├── core/                # 核心配置
-│       │   ├── database.py      # 数据库配置
-│       │   └── init_db.py       # 数据库初始化
-│       ├── models/              # 数据模型
-│       │   └── models.py        # SQLAlchemy模型
-│       ├── schemas/             # Pydantic模式
-│       │   └── schemas.py       # API模式定义
-│       ├── services/            # 业务逻辑
-│       │   ├── auth.py          # 认证服务
-│       │   └── crud.py          # CRUD操作
-│       └── main.py              # FastAPI应用入口
-├── public/                      # 静态资源
-├── .gitignore                   # Git忽略规则
-├── package.json                 # Node.js依赖配置
-├── vite.config.js              # Vite构建配置
-└── README.md                    # 项目文档
-```
+### API访问地址
+- 开发环境：http://localhost:8000
+- API文档：http://localhost:8000/docs (Swagger UI)
+- 另一种文档：http://localhost:8000/redoc
+
+### 主要API分类
+
+#### 任务相关
+- `GET /api/v1/tasks/urgent` - 获取急需处理任务
+- `GET /api/v1/tasks/` - 获取任务列表
+- `POST /api/v1/tasks/` - 创建任务
+- `PUT /api/v1/tasks/{task_id}` - 更新任务
+- `DELETE /api/v1/tasks/{task_id}` - 删除任务
+
+#### 长期任务相关
+- `GET /api/v1/long-term-tasks` - 获取所有长期任务
+- `POST /api/v1/long-term-tasks` - 创建长期任务
+- `PUT /api/v1/long-term-tasks/{task_id}` - 更新长期任务
+- `DELETE /api/v1/long-term-tasks/{task_id}` - 删除长期任务
+
+#### 日记相关
+- `GET /api/v1/journals/dates` - 获取有日志的日期
+- `GET /api/v1/journals/status` - 获取日志状态
+- `GET /api/v1/journals/{date}` - 获取指定日期的日记
+- `PUT /api/v1/journals/{date}` - 更新日记内容
+
+#### AI助手相关
+- `GET /api/v1/ai/config/{user_id}` - 获取AI配置
+- `PUT /api/v1/ai/config/{user_id}` - 更新AI配置
+- `POST /api/v1/ai/dialogues/{dialogue_id}/messages/stream` - AI对话流式接口
+
+#### 统计相关
+- `GET /api/v1/stats/heatmap` - 获取热力图数据
 
 ## 🔧 开发指南
+
+### 代码规范
+
+- **前端**：使用ESLint进行代码检查，遵循React最佳实践
+- **后端**：遵循PEP 8代码风格，使用类型注解
+- **提交规范**：使用语义化提交信息
 
 ### 添加新功能
 
@@ -163,41 +224,40 @@ touch backend/app/services/new_service.py
 
 3. **数据库迁移**
 ```bash
-# 创建数据库迁移
-alembic revision --autogenerate -m "Description"
+# 代码会自动创建表结构，无需额外迁移命令
 ```
 
-### 代码规范
-
-- 使用ESLint进行前端代码检查
-- 遵循PEP 8进行Python代码格式化
-- 使用有意义的变量和函数名
-- 添加适当的注释和文档字符串
-
-### 测试
+### 运行代码检查
 
 ```bash
-# 运行前端测试
-npm test
+# 前端代码检查
+npm run lint
 
-# 运行后端测试
+# 后端代码检查（使用flake8）
 cd backend
-pytest
+flake8 app/
 ```
 
 ## 🚀 部署
 
-### Docker部署（推荐）
+### 开发环境部署
+按照"快速开始"章节的步骤执行即可。
+
+### 生产环境部署建议
+
+1. **前端构建**
 ```bash
-# 构建并运行Docker容器
-docker-compose up -d
+npm run build
 ```
 
-### 传统部署
-1. 构建前端：`npm run build`
-2. 配置反向代理（如Nginx）
-3. 使用Gunicorn运行后端：`gunicorn main:app`
+2. **后端部署**
+- 使用Gunicorn运行FastAPI应用
+- 配置Nginx作为反向代理
+- 设置适当的环境变量
 
+3. **数据库配置**
+- 建议使用PostgreSQL或MySQL替代SQLite
+- 配置定期备份
 
 ## 🤝 贡献指南
 
@@ -209,17 +269,18 @@ docker-compose up -d
 
 ## 📝 更新日志
 
-### v1.0.0 (2024-12-10)
 - ✨ 初始版本发布
 - ✅ 基础任务管理功能
+- ✅ 长期任务管理
+- ✅ 子任务管理
+- ✅ AI助手功能
+- ✅ 日记功能
+- ✅ 热力图统计
 - ✅ 基础用户注册
-- ✅ 长期任务跟踪
-- ✅ 数据可视化
 
 ## 📄 许可证
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
 
 ## 🙏 致谢
 
@@ -228,6 +289,7 @@ docker-compose up -d
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [Vite](https://vitejs.dev/)
 - [SQLAlchemy](https://www.sqlalchemy.org/)
+
 ---
 
 ⭐ 如果这个项目对您有帮助，请给它一个星标！
