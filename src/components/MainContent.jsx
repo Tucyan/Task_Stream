@@ -6,6 +6,45 @@ import JournalView from '../views/JournalView.jsx'
 import AiAssistantView from '../views/AiAssistantView.jsx'
 import SettingsView from '../views/SettingsView.jsx'
 
+/**
+ * 主内容区域组件
+ * 根据当前视图状态渲染不同的页面内容
+ * 
+ * @param {Object} props - 组件属性
+ * @param {string} props.currentView - 当前选中的视图
+ * @param {Array} props.todayTasks - 今日任务列表
+ * @param {Function} props.onToggleTask - 切换任务完成状态的函数
+ * @param {Array} props.deadlines - 截止日期列表
+ * @param {Function} props.getUrgencyClass - 获取紧急程度CSS类的函数
+ * @param {string} props.detailFilter - 详细视图的过滤器
+ * @param {Function} props.setDetailFilter - 设置详细视图过滤器的函数
+ * @param {string} props.detailSearch - 详细视图的搜索关键词
+ * @param {Function} props.setDetailSearch - 设置详细视图搜索关键词的函数
+ * @param {string} props.filterDateStart - 日期范围过滤的开始日期
+ * @param {Function} props.setFilterDateStart - 设置日期范围过滤开始日期的函数
+ * @param {string} props.filterDateEnd - 日期范围过滤的结束日期
+ * @param {Function} props.setFilterDateEnd - 设置日期范围过滤结束日期的函数
+ * @param {Function} props.clearDateFilter - 清除日期范围过滤的函数
+ * @param {Array} props.filteredDetailTasks - 过滤后的详细任务列表
+ * @param {Array} props.baseDetailTasks - 基础详细任务列表
+ * @param {Function} props.onToggleDetailedTask - 切换详细任务完成状态的函数
+ * @param {boolean} props.isDarkMode - 是否为深色模式
+ * @param {Function} props.toggleDarkMode - 切换深色/浅色模式的函数
+ * @param {Object} props.settings - 用户设置
+ * @param {Function} props.setSettings - 设置用户设置的函数
+ * @param {Array} props.presetColors - 预设颜色列表
+ * @param {Function} props.resetTheme - 重置主题的函数
+ * @param {Function} props.saveSettings - 保存用户设置的函数
+ * @param {Function} props.onAddTask - 添加任务的函数
+ * @param {Function} props.onEditTask - 编辑任务的函数
+ * @param {Function} props.onDeleteTask - 删除任务的函数
+ * @param {number} props.userId - 用户ID
+ * @param {Function} props.onTaskUpdate - 任务更新事件处理函数
+ * @param {Object} props.user - 用户信息
+ * @param {Function} props.onLogout - 登出函数
+ * @param {Function} props.onUserUpdate - 用户信息更新回调函数
+ * @returns {JSX.Element} - MainContent组件
+ */
 export default function MainContent({
   currentView,
   todayTasks,

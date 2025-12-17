@@ -8,6 +8,16 @@ import calendar
 from datetime import datetime
 
 def create_task(task: schemas.TaskCreate, db: Session) -> schemas.Task:
+    """
+    创建新任务
+    
+    参数:
+        task: 任务创建数据，符合TaskCreate schema
+        db: 数据库会话
+    
+    返回:
+        schemas.Task: 创建成功的任务对象
+    """
     db_task = models.Task(
         user_id=task.user_id,
         title=task.title,
@@ -36,6 +46,16 @@ def create_task(task: schemas.TaskCreate, db: Session) -> schemas.Task:
     return map_task_to_schema(db_task)
 
 def delete_task(task_id: int, db: Session) -> bool:
+    """
+    删除指定ID的任务
+    
+    参数:
+        task_id: 要删除的任务ID
+        db: 数据库会话
+    
+    返回:
+        bool: 删除是否成功
+    """
     db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not db_task:
         return False
@@ -53,6 +73,16 @@ def delete_task(task_id: int, db: Session) -> bool:
     return True
 
 def create_long_term_task(task: schemas.LongTermTaskCreate, db: Session) -> schemas.LongTermTask:
+    """
+    创建长期任务
+    
+    参数:
+        task: 长期任务创建数据，符合LongTermTaskCreate schema
+        db: 数据库会话
+    
+    返回:
+        schemas.LongTermTask: 创建成功的长期任务对象
+    """
     db_lt = models.LongTermTask(
         user_id=task.user_id,
         title=task.title,
@@ -69,6 +99,16 @@ def create_long_term_task(task: schemas.LongTermTaskCreate, db: Session) -> sche
     return map_long_term_task_to_schema(db, db_lt)
 
 def delete_long_term_task(task_id: int, db: Session) -> bool:
+    """
+    删除长期任务
+    
+    参数:
+        task_id: 要删除的长期任务ID
+        db: 数据库会话
+    
+    返回:
+        bool: 删除是否成功
+    """
     db_lt = db.query(models.LongTermTask).filter(models.LongTermTask.id == task_id).first()
     if not db_lt:
         return False
@@ -77,6 +117,15 @@ def delete_long_term_task(task_id: int, db: Session) -> bool:
     return True
 
 def map_task_to_schema(t: models.Task) -> schemas.Task:
+    """
+    将数据库任务模型映射到API响应schema
+    
+    参数:
+        t: 数据库中的Task模型对象
+    
+    返回:
+        schemas.Task: API响应的Task对象
+    """
     # 处理关联的长期任务
     long_term_task = None
     if hasattr(t, 'long_term_task') and t.long_term_task:

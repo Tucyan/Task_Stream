@@ -1,18 +1,12 @@
-/*
- * 模块名称：api_service
- * 模块功能：API请求封装和处理，提供所有与后端交互的接口
- */
-
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-// 导入sha256库用于密码哈希
+//这里导入了服务器的公网ip
 import sha256 from 'js-sha256';
 
 /**
- * 通用Fetch请求封装
- * @param {string} url - 请求URL
- * @param {object} options - Fetch选项
- * @returns {Promise<any>} - 返回JSON数据
- * @throws {Error} - 请求失败时抛出错误
+ * 通用 Fetch 请求封装
+ * @param {string} url - 请求 URL
+ * @param {object} options - Fetch 选项
+ * @returns {Promise<any>} - 返回 JSON 数据
  */
 async function request(url, options = {}) {
     // 为昵称更新请求添加特殊标记
@@ -27,6 +21,7 @@ async function request(url, options = {}) {
             console.log('[API请求] 请求方法:', options.method);
             console.log('[API请求] 请求头:', options.headers);
             console.log('[API请求] 请求体:', options.body);
+            console.log('[API请求] 更新任务数据:', options.body);
         }
     } else if (isLongTermTaskRequest && options.body) {
         if (import.meta.env.DEV) {
@@ -68,26 +63,26 @@ async function request(url, options = {}) {
 
     if (!response.ok) {
         // 尝试获取详细的错误信息
-        let errorMessage = `API错误: ${response.statusText}`;
+        let errorMessage = `API Error: ${response.statusText}`;
         try {
             const errorData = await response.json();
             if (isNicknameUpdate) {
                 console.error('[API错误] 昵称更新错误详情:', errorData);
             } else {
-                console.error('错误详情:', errorData);
+                console.error('Error Details:', errorData);
             }
             if (errorData.detail) {
                 // 如果detail是数组，格式化每个错误
                 if (Array.isArray(errorData.detail)) {
-                    errorMessage = '验证错误:\n' + errorData.detail.map(err => {
+                    errorMessage = 'Validation errors:\n' + errorData.detail.map(err => {
                         return `- ${err.loc ? err.loc.join('.') + ': ' : ''}${err.msg}`;
                     }).join('\n');
                 } else {
-                    errorMessage = `API错误: ${errorData.detail}`;
+                    errorMessage = `API Error: ${errorData.detail}`;
                 }
             }
         } catch (e) {
-            console.error('无法解析错误响应:', e);
+            console.error('Could not parse error response:', e);
         }
         throw new Error(errorMessage);
     }
@@ -99,7 +94,7 @@ async function request(url, options = {}) {
  * 根据筛选日期范围获取范围内的全部任务
  * @param {string} startDate - 开始日期 (YYYY-MM-DD)
  * @param {string} endDate - 结束日期 (YYYY-MM-DD)
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @returns {Promise<Array>} - 任务列表
  */
 export async function getTasksInDateRange(startDate, endDate, userId) {
@@ -108,7 +103,7 @@ export async function getTasksInDateRange(startDate, endDate, userId) {
 
 /**
  * 获取指定用户的所有任务
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @returns {Promise<Array>} - 任务列表
  */
 export async function getAllTasksForUser(userId) {
@@ -117,7 +112,7 @@ export async function getAllTasksForUser(userId) {
 
 /**
  * 获取所有长期任务
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @returns {Promise<Array>} - 长期任务列表
  */
 export async function getAllLongTermTasks(userId) {
@@ -126,7 +121,7 @@ export async function getAllLongTermTasks(userId) {
 
 /**
  * 获取所有未完成的长期任务(按截止时间排序)
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @returns {Promise<Array>} - 长期任务列表
  */
 export async function getAllUncompletedLongTermTasks(userId) {
@@ -134,13 +129,15 @@ export async function getAllUncompletedLongTermTasks(userId) {
 }
 
 /**
- * 获取用户的所有紧急任务
- * @param {number} userId - 用户ID
- * @returns {Promise<Array>} - 紧急任务列表
+ * 获取用户急需处理的任务
+ * @param {number} userId - 用户 ID
+ * @returns {Promise<Array>} - 急需处理的任务列表
  */
 export async function getUrgentTasks(userId) {
     return request(`/api/v1/tasks/urgent?user_id=${userId}`);
 }
+
+
 
 /**
  * 创建新任务
@@ -156,7 +153,7 @@ export async function createTask(taskData) {
 
 /**
  * 删除任务
- * @param {number} taskId - 任务ID
+ * @param {number} taskId - 任务 ID
  * @returns {Promise<boolean>} - 是否删除成功
  */
 export async function deleteTask(taskId) {
@@ -167,7 +164,7 @@ export async function deleteTask(taskId) {
 
 /**
  * 获取指定ID的任务
- * @param {number} taskId - 任务ID
+ * @param {number} taskId - 任务 ID
  * @returns {Promise<object>} - 任务对象
  */
 export async function getTaskById(taskId) {
@@ -176,7 +173,7 @@ export async function getTaskById(taskId) {
 
 /**
  * 获取指定ID的长期任务
- * @param {number} taskId - 长期任务ID
+ * @param {number} taskId - 长期任务 ID
  * @returns {Promise<object>} - 长期任务对象
  */
 export async function getLongTermTaskById(taskId) {
@@ -185,7 +182,7 @@ export async function getLongTermTaskById(taskId) {
 
 /**
  * 更新任务信息
- * @param {number} taskId - 任务ID
+ * @param {number} taskId - 任务 ID
  * @param {object} taskData - 更新的任务数据
  * @returns {Promise<boolean>} - 是否更新成功
  */
@@ -211,19 +208,17 @@ export async function createLongTermTask(taskData) {
 // --- AI API ---
 
 /**
- * 获取用户AI配置
- * @param {number} userId - 用户ID
- * @returns {Promise<object>} - AI配置信息
+ * 获取用户 AI 配置
+ * @param {number} userId 
  */
 export async function getAiConfig(userId) {
     return request(`/api/v1/ai/config/${userId}`);
 }
 
 /**
- * 更新用户AI配置
- * @param {number} userId - 用户ID
- * @param {object} config - AI配置数据
- * @returns {Promise<object>} - 更新后的AI配置
+ * 更新用户 AI 配置
+ * @param {number} userId 
+ * @param {object} config 
  */
 export async function updateAiConfig(userId, config) {
     return request(`/api/v1/ai/config/${userId}`, {
@@ -234,8 +229,7 @@ export async function updateAiConfig(userId, config) {
 
 /**
  * 获取用户对话列表
- * @param {number} userId - 用户ID
- * @returns {Promise<Array>} - 对话列表
+ * @param {number} userId 
  */
 export async function getDialogues(userId) {
     return request(`/api/v1/ai/dialogues?user_id=${userId}`);
@@ -243,9 +237,8 @@ export async function getDialogues(userId) {
 
 /**
  * 获取单个对话详情（历史记录）
- * @param {number} dialogueId - 对话ID
- * @param {number} userId - 用户ID
- * @returns {Promise<object>} - 对话详情
+ * @param {number} dialogueId 
+ * @param {number} userId 
  */
 export async function getDialogue(dialogueId, userId) {
     return request(`/api/v1/ai/dialogues/${dialogueId}?user_id=${userId}`);
@@ -253,9 +246,8 @@ export async function getDialogue(dialogueId, userId) {
 
 /**
  * 创建新对话
- * @param {number} userId - 用户ID
- * @param {string} title - 对话标题
- * @returns {Promise<object>} - 创建的对话
+ * @param {number} userId 
+ * @param {string} title 
  */
 export async function createDialogue(userId, title) {
     return request('/api/v1/ai/dialogues', {
@@ -266,9 +258,8 @@ export async function createDialogue(userId, title) {
 
 /**
  * 删除对话
- * @param {number} dialogueId - 对话ID
- * @param {number} userId - 用户ID
- * @returns {Promise<object>} - 删除结果
+ * @param {number} dialogueId 
+ * @param {number} userId 
  */
 export async function deleteDialogue(dialogueId, userId) {
     return request(`/api/v1/ai/dialogues/${dialogueId}?user_id=${userId}`, {
@@ -277,10 +268,9 @@ export async function deleteDialogue(dialogueId, userId) {
 }
 
 /**
- * 确认AI操作
- * @param {string} actionId - 操作ID
- * @param {number} userId - 用户ID
- * @returns {Promise<object>} - 确认结果
+ * 确认 Action
+ * @param {string} actionId 
+ * @param {number} userId 
  */
 export async function confirmAiAction(actionId, userId) {
     return request(`/api/v1/ai/actions/${actionId}/confirm`, {
@@ -290,10 +280,9 @@ export async function confirmAiAction(actionId, userId) {
 }
 
 /**
- * 取消AI操作
- * @param {string} actionId - 操作ID
- * @param {number} userId - 用户ID
- * @returns {Promise<object>} - 取消结果
+ * 取消 Action
+ * @param {string} actionId 
+ * @param {number} userId 
  */
 export async function cancelAiAction(actionId, userId) {
     return request(`/api/v1/ai/actions/${actionId}/cancel`, {
@@ -303,12 +292,8 @@ export async function cancelAiAction(actionId, userId) {
 }
 
 /**
- * 发送消息并获取流式响应的URL和选项
- * 注意：这里只返回URL和fetch options，因为流式处理需要在组件中进行
- * @param {number} dialogueId - 对话ID
- * @param {number} userId - 用户ID
- * @param {string} content - 消息内容
- * @returns {object} - 包含URL和options的对象
+ * 发送消息并获取流式响应的 URL (用于 fetch 调用)
+ * 注意：这里只返回 URL 和 fetch options，因为流式处理需要在组件中进行
  */
 export function getChatStreamOptions(dialogueId, userId, content) {
     return {
@@ -322,7 +307,7 @@ export function getChatStreamOptions(dialogueId, userId, content) {
 
 /**
  * 删除长期任务
- * @param {number} taskId - 长期任务ID
+ * @param {number} taskId - 长期任务 ID
  * @returns {Promise<boolean>} - 是否删除成功
  */
 export async function deleteLongTermTask(taskId) {
@@ -333,7 +318,7 @@ export async function deleteLongTermTask(taskId) {
 
 /**
  * 更新长期任务信息
- * @param {number} taskId - 长期任务ID
+ * @param {number} taskId - 长期任务 ID
  * @param {object} taskData - 更新的长期任务数据
  * @returns {Promise<boolean>} - 是否更新成功
  */
@@ -347,7 +332,7 @@ export async function updateLongTermTask(taskId, taskData) {
 /**
  * 获取对应日期的日志
  * @param {string} date - 日期 (YYYY-MM-DD)
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @returns {Promise<object|null>} - 日志对象
  */
 export async function getJournalByDate(date, userId) {
@@ -357,12 +342,12 @@ export async function getJournalByDate(date, userId) {
 /**
  * 更新对应日期的日志内容
  * @param {string} date - 日期 (YYYY-MM-DD)
- * @param {string} content - 日志内容
- * @param {number} userId - 用户ID
+ * @param {string} content - 新的日志内容
+ * @param {number} userId - 用户 ID
  * @returns {Promise<boolean>} - 是否更新成功
  */
 export async function updateJournalContent(date, content, userId) {
-    // 使用新的PUT /api/v1/journals/{date}接口
+    // 使用新的 PUT /api/v1/journals/{date} 接口
     return request(`/api/v1/journals/${date}`, {
         method: 'PUT',
         body: JSON.stringify({ content, user_id: userId }),
@@ -373,7 +358,7 @@ export async function updateJournalContent(date, content, userId) {
  * 获取指定月份有日志的日期列表
  * @param {number} year - 年份
  * @param {number} month - 月份
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @returns {Promise<Array<number>>} - 有日志的日期列表
  */
 export async function getJournalDates(year, month, userId) {
@@ -384,7 +369,7 @@ export async function getJournalDates(year, month, userId) {
  * 获取指定月份的日志状态列表
  * @param {number} year - 年份
  * @param {number} month - 月份
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @returns {Promise<Array<boolean>>} - 日志状态列表
  */
 export async function getJournalStatus(year, month, userId) {
@@ -395,7 +380,7 @@ export async function getJournalStatus(year, month, userId) {
  * 根据年以及月份获取热力图信息
  * @param {number} year - 年份
  * @param {number} month - 月份
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @returns {Promise<Array<number>>} - 热力图数据
  */
 export async function getHeatmapData(year, month, userId) {
@@ -409,7 +394,7 @@ export async function getHeatmapData(year, month, userId) {
  * @returns {Promise<object>} - 注册结果
  */
 export async function register(username, password) {
-    // 注册时前端需传递passwordHash字段
+    // 注册时前端需传递 passwordHash 字段
     const passwordHash = await hashPassword(password);
     return request('/api/v1/auth/register', {
         method: 'POST',
@@ -417,13 +402,9 @@ export async function register(username, password) {
     });
 }
 
-/**
- * 前端密码哈希函数（与后端一致，SHA256）
- * @param {string} password - 原始密码
- * @returns {string} - 哈希后的密码
- */
+// 前端密码哈希函数（与后端一致，SHA256）
 async function hashPassword(password) {
-    // 使用js-sha256库进行哈希
+    // 使用 js-sha256 库进行哈希
     return sha256(password);
 }
 
@@ -434,7 +415,7 @@ async function hashPassword(password) {
  * @returns {Promise<object>} - 登录结果
  */
 export async function login(username, password) {
-    // 登录时前端需传递passwordHash字段
+    // 登录时前端需传递 passwordHash 字段
     const passwordHash = await hashPassword(password);
     return request('/api/v1/auth/login', {
         method: 'POST',
@@ -450,7 +431,7 @@ export async function login(username, password) {
  * @returns {Promise<object>} - 注册结果
  */
 export async function registerWithNickname(username, password, nickname) {
-    // 注册时前端需传递passwordHash字段
+    // 注册时前端需传递 passwordHash 字段
     const passwordHash = await hashPassword(password);
     return request('/api/v1/auth/register', {
         method: 'POST',
@@ -460,7 +441,7 @@ export async function registerWithNickname(username, password, nickname) {
 
 /**
  * 修改用户密码
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @param {string} currentPassword - 当前密码
  * @param {string} newPassword - 新密码
  * @returns {Promise<object>} - 修改结果
@@ -479,7 +460,7 @@ export async function updatePassword(userId, currentPassword, newPassword) {
 
 /**
  * 修改用户昵称
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @param {string} newNickname - 新昵称
  * @returns {Promise<object>} - 修改结果
  */
@@ -509,7 +490,7 @@ export async function updateNickname(userId, newNickname) {
 
 /**
  * 获取用户设置
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @returns {Promise<object|null>} - 设置对象
  */
 export async function getSettings(userId) {
@@ -519,7 +500,7 @@ export async function getSettings(userId) {
 /**
  * 创建用户设置
  * @param {object} settingsData - 设置数据
- * @returns {Promise<object>} - 创建的设置
+ * @returns {Promise<object>} - 创建的设置对象
  */
 export async function createSettings(settingsData) {
     return request('/api/v1/settings', {
@@ -530,9 +511,9 @@ export async function createSettings(settingsData) {
 
 /**
  * 更新用户设置
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @param {object} settingsData - 更新的设置数据
- * @returns {Promise<object>} - 更新后的设置
+ * @returns {Promise<object>} - 更新后的设置对象
  */
 export async function updateSettings(userId, settingsData) {
     return request(`/api/v1/settings/${userId}`, {
@@ -543,7 +524,7 @@ export async function updateSettings(userId, settingsData) {
 
 /**
  * 获取用户备忘录
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @returns {Promise<object|null>} - 备忘录对象
  */
 export async function getMemo(userId) {
@@ -552,9 +533,9 @@ export async function getMemo(userId) {
 
 /**
  * 更新用户备忘录
- * @param {number} userId - 用户ID
+ * @param {number} userId - 用户 ID
  * @param {string} content - 备忘录内容
- * @returns {Promise<object>} - 更新后的备忘录
+ * @returns {Promise<object>} - 更新后的备忘录对象
  */
 export async function updateMemo(userId, content) {
     return request(`/api/v1/memos/${userId}`, {

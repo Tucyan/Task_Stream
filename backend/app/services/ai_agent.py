@@ -1,3 +1,4 @@
+# 导入必要的库和模块
 import os
 import datetime
 from pathlib import Path
@@ -7,17 +8,31 @@ from app.services import ai_config_service
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
-# Calculate path to .env.production (root of Task_Stream)
-# Current file: backend/app/services/ai_agent.py
+# 计算.env.production文件路径（Task_Stream根目录）
+# 当前文件: backend/app/services/ai_agent.py
 # .env.production: Task_Stream/.env.production
 env_path = Path(__file__).resolve().parents[3] / ".env.production"
 load_dotenv(env_path)
 
 def init_agent_executor(user_id: int, db: Session, tools):
+    """
+    初始化AI代理执行器
+    
+    参数:
+        user_id: 用户ID，用于获取用户的AI配置
+        db: 数据库会话，用于查询用户配置
+        tools: AI代理可以使用的工具列表
+    
+    返回:
+        agent: 初始化完成的AI代理执行器
+    """
     config = ai_config_service.get_ai_config(db, user_id)
     
+    # 获取API密钥，优先使用用户配置，其次使用环境变量
     api_key = config.api_key if (config and config.api_key) else os.getenv("OPENAI_API_KEY")
+    # 获取API基础URL，默认使用阿里云DashScope兼容模式
     base_url = os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    # 获取模型名称，优先使用用户配置，其次使用默认模型
     model_name = config.model if (config and config.model) else "qwen-max"
     
     print(f"DEBUG: initializing agent. Model: {model_name}, BaseURL: {base_url}")

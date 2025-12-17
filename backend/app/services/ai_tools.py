@@ -8,8 +8,28 @@ from app.schemas import schemas
 import datetime
 
 def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
+    """
+    获取AI工具列表，包含任务管理、长期任务管理、日记管理和备忘录管理工具
+    
+    参数:
+        output_manager: 输出管理器，用于发送卡片和获取用户确认
+        user_id: 用户ID，用于标识操作的用户
+        db: 数据库会话，用于数据库操作
+    
+    返回:
+        List[StructuredTool]: AI工具列表
+    """
     
     def check_auto_confirm(action_type: str) -> bool:
+        """
+        检查用户是否开启了自动确认功能
+        
+        参数:
+            action_type: 操作类型，可选值为 'create', 'update', 'delete'
+        
+        返回:
+            bool: 如果开启了自动确认则返回True，否则返回False
+        """
         config = ai_config_service.get_ai_config(db, user_id)
         if not config: return False
         if action_type == 'create':

@@ -1,19 +1,37 @@
 import React, { useState, useEffect } from 'react'
 import { getHeatmapData } from '../services/api.js'
 
+/**
+ * 侧边栏组件
+ * 包含应用导航和热力图展示
+ * 
+ * @param {Object} props - 组件属性
+ * @param {string} props.currentView - 当前选中的视图
+ * @param {Function} props.setCurrentView - 设置当前视图的函数
+ * @param {string} props.primaryColor - 主色调
+ * @param {number} props.userId - 用户ID
+ * @param {number} props.heatmapTrigger - 热力图刷新触发器
+ * @param {Function} props.onHeatmapClick - 热力图点击事件处理函数
+ * @param {string} [props.className=''] - 自定义CSS类名
+ * @returns {JSX.Element} - Sidebar组件
+ */
 export default function Sidebar({ currentView, setCurrentView, primaryColor, userId, heatmapTrigger, onHeatmapClick, className = '' }) {
+  // 热力图显示的当前日期
   const [heatmapDate, setHeatmapDate] = useState(new Date())
+  // 热力图数据，存储每月每天的活动强度
   const [heatmapData, setHeatmapData] = useState([])
 
+  // 当前月份的年份、月份、天数和第一天是星期几
   const year = heatmapDate.getFullYear()
   const month = heatmapDate.getMonth()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const firstDayOfMonth = new Date(year, month, 1).getDay()
 
-  // Calculate empty cells needed to maintain fixed 6 rows (6 * 7 = 42 cells total)
+  // 计算需要填充的空单元格数量，以保持固定的6行（6 * 7 = 42个单元格）
   const totalCells = firstDayOfMonth + daysInMonth
   const cellsToFill = 42 - totalCells
 
+  // 当热力图日期、用户ID或刷新触发器变化时，重新获取热力图数据
   useEffect(() => {
     console.log('Sidebar: useEffect triggered', { userId, heatmapDate, heatmapTrigger })
     if (!userId) {
@@ -36,6 +54,12 @@ export default function Sidebar({ currentView, setCurrentView, primaryColor, use
     fetchHeatmap()
   }, [heatmapDate, userId, heatmapTrigger])
 
+  /**
+   * 将十六进制颜色转换为RGB格式
+   * 
+   * @param {string} hex - 十六进制颜色值
+   * @returns {Object|null} - RGB颜色对象或null
+   */
   const hexToRgb = (hex) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
     return result ? {
@@ -45,8 +69,14 @@ export default function Sidebar({ currentView, setCurrentView, primaryColor, use
     } : null
   }
 
+  /**
+   * 根据热力图数据获取单元格样式
+   * 
+   * @param {number} day - 日期（1-31）
+   * @returns {Object} - CSS样式对象
+   */
   const getHeatmapCellStyle = (day) => {
-    // heatmapData index 0 corresponds to day 1
+    // heatmapData索引0对应日期1
     const level = heatmapData[day - 1] || 0
     
     if (level === 0) return {}
@@ -54,14 +84,8 @@ export default function Sidebar({ currentView, setCurrentView, primaryColor, use
     const rgb = hexToRgb(primaryColor || '#6366f1')
     if (!rgb) return {}
 
-    // Map level 1-6 to opacity 0.15 - 1.0
-    // level 0 is handled above (empty)
-    // level 1: 0.15
-    // level 2: 0.3
-    // level 3: 0.45
-    // level 4: 0.6
-    // level 5: 0.8
-    // level 6: 1.0
+    // 将热力图等级映射到透明度
+    // 等级1-6对应透明度0.15-1.0
     const opacity = Math.min(level * 0.16 + 0.04, 1)
 
     return {
@@ -69,14 +93,26 @@ export default function Sidebar({ currentView, setCurrentView, primaryColor, use
     }
   }
 
+  /**
+   * 切换到上一个月
+   */
   const prevMonth = () => {
     setHeatmapDate(new Date(year, month - 1, 1))
   }
 
+  /**
+   * 切换到下一个月
+   */
   const nextMonth = () => {
     setHeatmapDate(new Date(year, month + 1, 1))
   }
 
+  /**
+   * 根据当前视图返回导航项的CSS类名
+   * 
+   * @param {string} view - 视图名称
+   * @returns {string} - CSS类名
+   */
   const navClass = (view) => (
     currentView === view
       ? 'bg-primary text-white shadow-lg shadow-primary/30 font-bold'

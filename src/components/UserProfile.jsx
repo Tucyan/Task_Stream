@@ -1,20 +1,37 @@
 import React, { useState, useEffect } from 'react'
 import * as api from '../services/api.js'
 
+/**
+ * 用户资料组件
+ * 显示用户信息，提供昵称修改和密码修改功能
+ * 
+ * @param {Object} props - 组件属性
+ * @param {Object} props.user - 用户信息对象
+ * @param {Function} props.onLogout - 登出函数
+ * @param {Function} props.onUserUpdate - 用户信息更新回调函数
+ * @param {boolean} [props.compact=false] - 是否使用紧凑模式
+ * @returns {JSX.Element} - UserProfile组件
+ */
 export default function UserProfile({ user, onLogout, onUserUpdate, compact = false }) {
-  const [showProfileModal, setShowProfileModal] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [nickname, setNickname] = useState(user?.nickname || '')
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  // 状态管理
+  const [showProfileModal, setShowProfileModal] = useState(false) // 是否显示资料模态框
+  const [showDropdown, setShowDropdown] = useState(false) // 是否显示下拉菜单
+  const [nickname, setNickname] = useState(user?.nickname || '') // 昵称
+  const [currentPassword, setCurrentPassword] = useState('') // 当前密码
+  const [newPassword, setNewPassword] = useState('') // 新密码
+  const [loading, setLoading] = useState(false) // 加载状态
+  const [error, setError] = useState('') // 错误信息
+  const [success, setSuccess] = useState('') // 成功信息
 
+  // 用户信息更新时，同步更新昵称
   useEffect(() => {
     setNickname(user?.nickname || '')
   }, [user])
 
+  /**
+   * 更新用户昵称
+   * 调用API更新昵称，并更新本地存储和父组件状态
+   */
   const handleUpdateNickname = async () => {
     if (!nickname.trim()) {
       setError('昵称不能为空')
@@ -27,6 +44,7 @@ export default function UserProfile({ user, onLogout, onUserUpdate, compact = fa
       await api.updateNickname(user.id, nickname)
       const updatedUser = { ...user, nickname: nickname }
       
+      // 更新本地存储的用户信息
       const savedUser = localStorage.getItem('taskStreamUser')
       if (savedUser) {
         const userInfo = JSON.parse(savedUser)
@@ -34,12 +52,13 @@ export default function UserProfile({ user, onLogout, onUserUpdate, compact = fa
         localStorage.setItem('taskStreamUser', JSON.stringify(userInfo))
       }
       
+      // 通知父组件更新用户信息
       if (onUserUpdate) {
         onUserUpdate(updatedUser)
       }
       
       setSuccess('昵称更新成功')
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 3000) // 3秒后清空成功信息
     } catch (e) {
       setError(e.message || '更新昵称失败')
     } finally {
@@ -47,6 +66,10 @@ export default function UserProfile({ user, onLogout, onUserUpdate, compact = fa
     }
   }
 
+  /**
+   * 更新用户密码
+   * 调用API更新密码，成功后清空输入框
+   */
   const handleUpdatePassword = async () => {
     if (!currentPassword.trim() || !newPassword.trim()) {
       setError('请输入当前密码和新密码')
@@ -58,9 +81,9 @@ export default function UserProfile({ user, onLogout, onUserUpdate, compact = fa
     try {
       await api.updatePassword(user.id, currentPassword, newPassword)
       setSuccess('密码更新成功')
-      setCurrentPassword('')
-      setNewPassword('')
-      setTimeout(() => setSuccess(''), 3000)
+      setCurrentPassword('') // 清空当前密码输入框
+      setNewPassword('') // 清空新密码输入框
+      setTimeout(() => setSuccess(''), 3000) // 3秒后清空成功信息
     } catch (e) {
       setError(e.message || '更新密码失败')
     } finally {
