@@ -122,9 +122,6 @@ class AIConfigBase(BaseModel):
     prompt: Optional[str] = None
     character: Optional[str] = None
     long_term_memory: Optional[str] = None
-    # 这里的 list 在 DB 是 Text，但在 API 交互中最好是 List。
-    # 为了简化，我们先假设 CRUD 层处理好序列化，或者直接透传 JSON string，
-    # 但根据文档，前端拿到的是对象。所以这里用 List，CRUD 负责转换。
     ai_dialogue_id_list: Optional[List[int]] = []
     is_enable_prompt: int = 0
     is_auto_confirm_create_request: int = 0

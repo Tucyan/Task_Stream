@@ -38,6 +38,7 @@
 - **Vite** - 快速构建工具
 - **CSS3** - 现代样式方案
 - **ESLint** - 代码质量检查
+- **ByteMD** - Markdown编辑器
 - **React Markdown** - Markdown渲染
 
 ### 后端
@@ -269,6 +270,7 @@ npm run build
 
 ## 📝 更新日志
 
+### v1.0.0 (2024-12-10)
 - ✨ 初始版本发布
 - ✅ 基础任务管理功能
 - ✅ 长期任务管理
@@ -289,6 +291,7 @@ npm run build
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [Vite](https://vitejs.dev/)
 - [SQLAlchemy](https://www.sqlalchemy.org/)
+- [ByteMD](https://bytemd.js.org/)
 
 ---
 

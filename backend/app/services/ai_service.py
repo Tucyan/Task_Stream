@@ -1,3 +1,8 @@
+"""
+模块名称：ai_service
+模块功能：AI服务相关逻辑处理，包括工具映射、对话流管理
+"""
+
 import asyncio
 import json
 import uuid
@@ -6,8 +11,18 @@ from app.services import ai_agent, ai_tools, ai_output_manager, ai_config_servic
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 from app.core.database import SessionLocal
 
+
 def map_card_to_tool(card_type, card_data):
-    """根据卡片类型和数据，推断工具名称和参数"""
+    """
+    根据卡片类型和数据，推断工具名称和参数
+    
+    参数：
+        card_type (int): 卡片类型
+        card_data (dict): 卡片数据
+    
+    返回值：
+        tuple: (工具名称, 工具参数)
+    """
     tool_name = "unknown_tool"
     tool_args = {}
     
@@ -30,7 +45,7 @@ def map_card_to_tool(card_type, card_data):
             tool_name = "delete_long_term_task"
             tool_args = {"task_id": card_data.get("task_id")}
         else:
-            tool_name = "confirm_action" # 假设存在这样的工具，或者 generic action
+            tool_name = "confirm_action"  # 假设存在这样的工具，或者 generic action
             tool_args = {"action_id": card_data.get("action_id")}
     elif card_type == 3:
         tool_name = "update_task"
@@ -64,22 +79,37 @@ def map_card_to_tool(card_type, card_data):
     tool_args = {k: v for k, v in tool_args.items() if v is not None}
     return tool_name, tool_args
 
+
 async def run_chat_stream(user_id: int, dialogue_id: int, content: str):
+    """
+    运行聊天流，处理用户输入并生成AI响应
+    
+    参数：
+        user_id (int): 用户ID
+        dialogue_id (int): 对话ID
+        content (str): 用户输入内容
+    
+    返回值：
+        ai_output_manager.OutputManager: 输出管理器实例
+    """
     output_manager = ai_output_manager.OutputManager()
     
     async def run_agent():
+        """
+        运行AI代理，处理用户请求
+        """
         print(f"DEBUG_TRACE: run_agent started for dialogue {dialogue_id}")
         db = SessionLocal()
         try:
-            # 1. 获取 Tools
+            # 1. 获取工具列表
             print("DEBUG_TRACE: Initializing tools...")
             tools = ai_tools.get_ai_tools(output_manager, user_id, db)
             
-            # 2. 初始化 Agent
+            # 2. 初始化代理执行器
             print("DEBUG_TRACE: Initializing agent executor...")
             agent_executor = ai_agent.init_agent_executor(user_id, db, tools)
             
-            # 3. 准备 Chat History
+            # 3. 准备聊天历史
             print("DEBUG_TRACE: Loading chat history...")
             dialogue = ai_config_service.get_dialogue(db, dialogue_id, user_id)
             chat_history = []
@@ -115,7 +145,7 @@ async def run_chat_stream(user_id: int, dialogue_id: int, content: str):
                                         # 1. 构造 AIMessage (包含 tool_calls)
                                         # 将目前积累的文本作为 content
                                         text_content = "\n".join(current_text_parts)
-                                        current_text_parts = [] # 清空缓冲
+                                        current_text_parts = []  # 清空缓冲
                                         
                                         ai_msg = AIMessage(
                                             content=text_content,
@@ -154,7 +184,17 @@ async def run_chat_stream(user_id: int, dialogue_id: int, content: str):
             # 4. 定义回调
             from langchain_core.callbacks import BaseCallbackHandler
             class StreamCallback(BaseCallbackHandler):
+                """
+                流回调处理器，用于处理LLM生成的新token
+                """
                 async def on_llm_new_token(self, token: str, **kwargs):
+                    """
+                    当LLM生成新token时调用
+                    
+                    参数：
+                        token (str): 生成的token
+                        **kwargs: 其他关键字参数
+                    """
                     # 只有当 token 是普通文本内容时才输出
                     # LangChain 的 on_llm_new_token 可能会包含工具调用的 JSON 片段
                     # 我们需要检查 kwargs 中的 chunk 信息来区分
@@ -168,11 +208,11 @@ async def run_chat_stream(user_id: int, dialogue_id: int, content: str):
                          # print(f"DEBUG_TRACE: Streaming token: {token[:5]}...") # Verbose
                          await output_manager.stream_text(token)
             
-            # 5. 发送 Start
+            # 5. 发送开始事件
             print("DEBUG_TRACE: Sending 'start' event")
             await output_manager.queue.put({"event": "start", "data": json.dumps({"dialogue_id": dialogue_id})})
 
-            # 6. 运行 Agent
+            # 6. 运行代理
             # create_agent 返回的是一个 CompiledGraph，输入通常是 messages
             # 我们将 chat_history 和本次 user input 组合
             chat_history.append(HumanMessage(content=content))
@@ -184,7 +224,7 @@ async def run_chat_stream(user_id: int, dialogue_id: int, content: str):
             )
             print("DEBUG_TRACE: agent_executor.ainvoke finished.")
             
-            # 7. 保存历史
+            # 7. 保存历史记录
             final_content = output_manager.get_final_content()
             new_turn = [
                 {"role": "user", "content": content},

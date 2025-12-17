@@ -52,10 +52,8 @@ def init_agent_executor(user_id: int, db: Session, tools):
     
     system_prompt = f"""
     {character_prompt}
-    
-    每次用户提问的时候你都需要展示你可以使用的工具，以及每个工具的参数。
 
-    然后你需要根据用户的需求选择是否调用工具以及调用什么工具。
+    你需要根据用户的需求选择是否调用工具以及调用什么工具。
     
     用户需要的现在的时间是 {current_time}
     
