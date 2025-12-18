@@ -27,23 +27,7 @@ app = FastAPI(title="Task Stream API")
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "http://localhost",
-        "https://localhost",
-        "capacitor://localhost",
-        "ionic://localhost",
-        # 生产环境公网IP地址
-        "http://39.105.153.48",
-        "http://39.105.153.48:8000",
-        # 允许来自任何Android应用的请求（生产环境）
-        "capacitor://*",
-        "http://*",
-        "https://*",
-    ],
+    allow_origins=["*"],       # 允许所有来源（临时解决方案）
     allow_credentials=True,    # 允许携带Cookie等凭证
     allow_methods=["*"],       # 允许所有HTTP方法（GET/POST/PUT/DELETE等）
     allow_headers=["*"],       # 允许所有请求头
