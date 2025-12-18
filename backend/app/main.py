@@ -27,8 +27,8 @@ app = FastAPI(title="Task Stream API")
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],       # 允许所有来源（临时解决方案）
-    allow_credentials=True,    # 允许携带Cookie等凭证
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],       # 允许所有HTTP方法（GET/POST/PUT/DELETE等）
     allow_headers=["*"],       # 允许所有请求头
 )
