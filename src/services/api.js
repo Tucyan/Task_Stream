@@ -1,6 +1,15 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-//这里导入了服务器的公网ip
 import sha256 from 'js-sha256';
+
+const envBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const isNativePlatform =
+    typeof window !== 'undefined' &&
+    window.Capacitor &&
+    (typeof window.Capacitor.isNativePlatform === 'function'
+        ? window.Capacitor.isNativePlatform()
+        : !!window.Capacitor.isNativePlatform);
+const storageBaseUrl =
+    typeof window !== 'undefined' ? window.localStorage?.getItem('apiBaseUrl') : null;
+export const API_BASE_URL = envBaseUrl || storageBaseUrl || (import.meta.env.DEV ? '' : '');
 
 /**
  * 通用 Fetch 请求封装
@@ -9,6 +18,11 @@ import sha256 from 'js-sha256';
  * @returns {Promise<any>} - 返回 JSON 数据
  */
 async function request(url, options = {}) {
+    if (!API_BASE_URL && isNativePlatform && !import.meta.env.DEV) {
+        throw new Error(
+            'Missing API base URL. Set VITE_API_BASE_URL (e.g. http://电脑局域网IP:8000) and rebuild the app.'
+        );
+    }
     // 为昵称更新请求添加特殊标记
     const isNicknameUpdate = url.includes('/api/v1/auth/nickname');
     // 为长期任务请求添加特殊标记

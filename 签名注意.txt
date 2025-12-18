@@ -1,0 +1,26 @@
+- 新增了签名配置示例文件： android/keystore.properties.example
+- 并已把 android/keystore.properties 加入忽略（不会提交到仓库）： .gitignore
+你以后不想每次手动 set 环境变量的话
+
+- 复制 android/keystore.properties.example 为 android/keystore.properties ，填好这四项：
+  - storeFile / storePassword / keyAlias / keyPassword
+- 然后再跑 npm run android:release:apk 就会稳定输出 app-release.apk 。
+
+怎么修
+
+- 把 android/keystore.properties 这 3 个值替换成真实值（不要带引号，不要留 REPLACE_ME ）：
+  - storeFile=keystore/release.keystore
+  - storePassword=你的 keystore 密码
+  - keyAlias=你的 alias
+  - keyPassword=你的 key 密码
+如果你不知道 alias 是什么
+
+- 用这个命令查看（会提示输入 keystore 密码）：
+  - C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot\bin\keytool.exe -list -v -keystore android\keystore\release.keystore
+不想写到文件里（推荐）就用环境变量 在 PowerShell 里执行（把值换成你的）：
+
+- $env:ANDROID_KEYSTORE_PATH='C:\...\Task_Stream\android\keystore\release.keystore'
+- $env:ANDROID_KEYSTORE_PASSWORD='...'
+- $env:ANDROID_KEY_ALIAS='...'
+- $env:ANDROID_KEY_PASSWORD='...' 然后再跑： npm run android:release:apk
+补充：我已经把 storeFile 的相对路径解析修正为相对 android/ 目录，所以 storeFile=keystore/release.keystore 这种写法现在是正确可用的。

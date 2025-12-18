@@ -1,0 +1,173 @@
+【问题名称】
+Android 应用中前端请求后端接口出现 “Failed to fetch”
+
+【问题背景】
+- 前端：React + Vite，打包后通过 Capacitor 封装为 Android 应用，WebView 载入前端页面。
+- 后端：FastAPI，运行在本机 `http://<局域网 IP>:8000`，典型接口为 `http://<IP>:8000/api/v1/...`。
+- CORS 配置：在 `backend/app/main.py:26-34` 使用 `CORSMiddleware`，允许任意源、任意方法与请求头：
+  - `allow_origins=["*"]`
+  - `allow_credentials=False`
+  - `allow_methods=["*"]`
+  - `allow_headers=["*"]`
+
+在浏览器中直接访问 `http://<IP>:8000/docs` 或通过 Web 版前端访问接口都正常；但安装到手机上的 Android 应用内却频繁出现 “Failed to fetch”。
+
+【表面现象】
+- 在应用 UI 上，登录等需要访问后端的操作直接报错 “Failed to fetch”。
+- 使用手机浏览器访问 `http://<电脑 IP>:8000/docs` 能正常打开 Swagger UI，并可调用接口，说明：
+  - 手机与电脑处于同一局域网，网络连通性正常；
+  - 后端 FastAPI 服务正常工作；
+  - CORS 对来自浏览器的请求没有明显阻碍。
+- 问题只在 Android 应用内出现，而不是后端或浏览器本身的问题。
+
+【初步排查与排除项】
+1. **怀疑 CORS 配置问题**
+   - 检查 `backend/app/main.py:26-34` 的 CORS 配置：
+     - `allow_origins=["*"]`
+     - `allow_credentials=False`
+     - `allow_methods=["*"]`
+     - `allow_headers=["*"]`
+   - 设置上是放开的，并且浏览器访问一切正常，结合现象可以基本排除 CORS 为根因。
+
+2. **确认 API Base URL 配置**
+   - 在前端 `src/services/api.js` 中，API 根地址从环境变量 `VITE_API_BASE_URL` 读取，如果生产环境缺失会直接抛出错误，避免静默配置错误。
+   - 通过检查与运行确认，打包时 API Base URL 指向的地址是 `http://<局域网 IP>:8000`，与手机浏览器访问的地址一致，因此也可以排除 “请求发错地址”。
+
+3. **确认后端是否收到请求**
+   - 观察 FastAPI 控制台日志，在 Android 应用操作时没有对应请求日志，说明请求在到达服务器之前就被浏览器内核/系统拦截了，而不是被后端拒绝。
+
+【深入排查：使用 ADB 查看日志】
+为了确定请求在什么阶段失败，对连接了 USB 调试的手机使用 ADB 查看系统日志：
+
+- 使用命令（示例）：
+  - `adb logcat | findstr chromium`
+  - 或通过 Android Studio 的 Logcat 过滤 WebView / chromium 相关日志。
+
+在触发前端请求时，从日志中观察到类似信息（示意）：
+
+- `Mixed Content: The page at 'https://localhost/' was loaded over HTTPS, but requested an insecure resource 'http://192.168.x.x:8000/api/v1/auth/login'. This request has been blocked; the content must be served over HTTPS.`
+
+**关键信息提取：**
+- WebView 认为当前页面的来源是 `https://localhost/`（即 HTTPS）。
+- 前端通过 `fetch` 请求的后端接口是 `http://...`（HTTP）。
+- 这是典型的 **mixed content（混合内容）** 场景：
+  - HTTPS 页面试图请求 HTTP 资源。
+  - 现代浏览器 / WebView 默认会拦截这类请求，以保证安全。
+
+这解释了为什么：
+- 后端没有日志 —— 请求被浏览器内核在发出前就拦截。
+- 前端只能拿到一个通用的 “Failed to fetch” —— 底层网络请求被安全策略阻断。
+- 手机浏览器访问 http://<IP>:8000/docs 正常 —— 因为那是直接访问 HTTP 页面本身，而不是从 HTTPS 页面中去请求 HTTP 接口。
+
+【根因分析】
+根因可以总结为：
+
+> Android 应用中的 WebView 以 HTTPS（`https://localhost`）的身份运行前端页面，而前端却向 HTTP（`http://<局域网 IP>:8000`）的后端发起请求，触发了浏览器内核的 mixed content 安全策略，从而拦截了所有 HTTP 请求，最终在前端表现为 “Failed to fetch”。
+
+关键点：
+- 并不是后端 CORS 配置不当，也不是网络不通或 API 地址错误；
+- 而是 **前端运行环境**（Android WebView）对 “HTTPS 页面访问 HTTP 接口” 这种行为进行拦截。
+
+【解决思路】
+有两类理论上的解决方向：
+
+1. **从协议层统一为 HTTPS**
+   - 把后端接口迁移到 HTTPS，或在本机起 HTTPS 代理，把 `http://` 替换成 `https://`。
+   - 这样前端与后端都是 HTTPS，浏览器不会再认为这是 mixed content。
+   - 这是更接近生产环境的理想方案，但在本地开发阶段搭建 HTTPS 证书与信任链稍显繁琐。
+
+2. **在开发 / 调试阶段放宽 WebView 对 mixed content 的限制**
+   - 明确告诉 Android WebView：允许在 HTTPS 页面中加载 HTTP 资源。
+   - 这会降低安全性，因此只适合在内网、本机开发调试场景使用，不适合面向公网的生产环境。
+
+综合当前需求（本地局域网调试），采用方案 2 更现实。
+
+【具体解决方案实施】
+
+本项目针对 Android / Capacitor 侧做了两处配置调整，以允许 mixed content：
+
+1. **在 MainActivity 中显式允许 Mixed Content**
+   - 文件位置：`android/app/src/main/java/com/taskstream/app/MainActivity.java:1-15`
+   - 核心代码：
+     - 在 `onCreate` 中拿到 WebView 的 `WebSettings`，调用：
+       - `setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW)`
+   - 效果：
+     - 告诉 Android WebView：即使当前页面是 HTTPS，也允许加载 HTTP 资源。
+
+2. **在 Capacitor 配置中启用 allowMixedContent**
+   - 文件位置：`capacitor.config.json:1-8`
+   - 增加配置：
+     - `"android": { "allowMixedContent": true }`
+   - 通过 `npm run android:build` 执行：
+     - `vite build`
+     - `npx cap sync android`
+   - 确认生成文件 `android/app/src/main/assets/capacitor.config.json:1-8` 中也包含：
+     - `"android": { "allowMixedContent": true }`
+
+3. **辅助配置（此前已就位）**
+   - 在 `android/app/src/main/AndroidManifest.xml` 中设置：
+     - `android:usesCleartextTraffic="true"`
+   - 这一项允许应用访问非加密的 HTTP 流量，配合上面两步使 mixed content 请求可以真正发出。
+
+【验证过程】
+
+1. **重新打包同步配置**
+   - 在项目根目录执行：
+     - `npm run android:build`
+       - 完成前端打包与 Capacitor 同步。
+     - 在 `android` 目录执行：
+       - `.\gradlew.bat assembleDebug`
+       - 生成新的 debug APK。
+
+2. **重新安装并运行应用**
+   - 卸载手机上旧版本应用（之前产生 INSTALL_FAILED_UPDATE_INCOMPATIBLE 时也曾执行过这一步）。
+   - 安装新的 APK，启动应用。
+
+3. **功能验证**
+   - 在应用中进行登录、获取任务等需要访问后端接口的操作。
+   - 观察现象：
+     - “Failed to fetch” 错误不再出现。
+     - 后端 FastAPI 控制台可以看到对应的 HTTP 请求日志。
+   - 如有需要，再次使用 ADB 查看日志，已不再出现 mixed content 拦截提示。
+
+【与 CORS 等配置的关系】
+- 当前后端 CORS 中间件配置依旧是：
+  - `allow_origins=["*"]`
+  - `allow_credentials=False`
+  - `allow_methods=["*"]`
+  - `allow_headers=["*"]`
+- 该配置在本次问题中 **不是根因**，但有几点值得注意：
+  - `allow_origins=["*"]` 与 `allow_credentials=True` 在标准 CORS 中是冲突的，因此这里选择 `allow_credentials=False` 是正确的。
+  - 即便 CORS 配置完全正确，如果发生 mixed content，被拦截的是浏览器网络层，请求根本不会到达后端，CORS 也就无从发挥作用。
+
+【经验总结与建议】
+
+1. **看到 “Failed to fetch” 不要只盯 CORS**
+   - “Failed to fetch” 是一个非常泛的错误，它可能来自：
+     - CORS 拦截；
+     - mixed content；
+     - DNS / 网络不可达；
+     - HTTPS 证书问题；
+     - 甚至是 JS 代码本身抛出异常。
+   - 在浏览器/Android 应用中，配合开发者工具或 ADB 日志定位具体错误信息非常关键。
+
+2. **区分浏览器环境与 WebView 环境**
+   - 浏览器中一切正常，并不意味着 WebView 中也一定正常。
+   - Capacitor 封装后的应用，其页面来源、协议（http/https）、安全策略都可能与开发时的浏览器环境不同。
+
+3. **开发阶段可以适度放宽，生产阶段必须收紧**
+   - 在局域网、本机调试阶段，为方便开发，可以：
+     - 启用 `allowMixedContent`;
+     - 允许 HTTP 明文流量；
+     - CORS 设置放宽。
+   - 但在面向公网的正式发布版本中，应尽量：
+     - 全链路使用 HTTPS；
+     - 禁用 mixed content；
+     - 收紧 CORS 配置，仅对白名单域名开放。
+
+4. **调试时优先查系统 / WebView 日志**
+   - 对于移动端 “Failed to fetch” 这类问题，使用 ADB / Logcat 查看 WebView 的具体报错信息，往往能迅速锁定根因（如 mixed content、证书错误等）。
+
+【结论】
+本次 “Failed to fetch” 问题的根本原因是：**Android WebView 中 HTTPS 页面请求 HTTP 接口导致的 mixed content 被拦截**，而不是后端 CORS 配置错误或网络不通。通过在 Android 侧显式允许 mixed content（`MainActivity` 中设置 `MIXED_CONTENT_ALWAYS_ALLOW`，以及 `capacitor.config.json` 中配置 `android.allowMixedContent=true`），问题已解决，应用可以正常访问本机局域网中的 FastAPI 接口。
+

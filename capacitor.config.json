@@ -1,0 +1,8 @@
+{
+  "appId": "com.taskstream.app",
+  "appName": "Task Stream",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true
+  }
+}

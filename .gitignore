@@ -11,6 +11,12 @@ node_modules
 dist
 dist-ssr
 *.local
+.android-sdk/
+android/keystore/
+android/keystore.properties
+android/local.properties
+*.jks
+*.keystore
 
 # Editor directories and files
 .vscode/*
@@ -55,3 +61,4 @@ db.sqlite3
 coverage
 build
 *.tsbuildinfo
+.gradle/
