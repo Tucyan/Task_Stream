@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as api from '../services/api';
 import taskEventBus from '../utils/eventBus';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function AiAssistantView() {
     const [userId, setUserId] = useState(1);
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    // Default to closed on mobile (< 768px), open on desktop
+    const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
     const [settingsOpen, setSettingsOpen] = useState(false);
     
     // Data States
@@ -18,6 +21,7 @@ export default function AiAssistantView() {
     const [aiConfig, setAiConfig] = useState({
         api_key: '',
         model: 'qwen-flash',
+        openai_base_url: '',
         prompt: '',
         character: '默认',
         long_term_memory: '',
@@ -31,6 +35,7 @@ export default function AiAssistantView() {
     // Refs
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+    const touchStartRef = useRef(null); // For swipe detection
 
     // Initialize
     useEffect(() => {
@@ -57,7 +62,11 @@ export default function AiAssistantView() {
         try {
             const res = await api.getAiConfig(uid);
             // Ensure numeric fields are numbers (API might return them, but just in case)
-            setAiConfig(res);
+            setAiConfig(prev => ({
+                ...prev,
+                ...res,
+                openai_base_url: res?.openai_base_url ?? prev.openai_base_url ?? ''
+            }));
         } catch (e) {
             console.error("Failed to load AI config", e);
         }
@@ -274,6 +283,41 @@ export default function AiAssistantView() {
         });
     };
 
+    const handleTouchStart = (e) => {
+        touchStartRef.current = {
+            x: e.touches[0].clientX,
+            y: e.touches[0].clientY
+        };
+    };
+
+    const handleTouchEnd = (e) => {
+        if (!touchStartRef.current) return;
+        
+        const touchEnd = {
+            x: e.changedTouches[0].clientX,
+            y: e.changedTouches[0].clientY
+        };
+        
+        const xDiff = touchEnd.x - touchStartRef.current.x;
+        const yDiff = touchEnd.y - touchStartRef.current.y;
+        
+        // Reset
+        touchStartRef.current = null;
+        
+        // Horizontal swipe detection (threshold 50px, and horizontal > vertical)
+        if (Math.abs(xDiff) > 50 && Math.abs(xDiff) > Math.abs(yDiff)) {
+            // Swipe Right (Open)
+            if (xDiff > 0 && !sidebarOpen) {
+                // Only allow opening if started from the left edge area (e.g. first 50% of screen)
+                setSidebarOpen(true);
+            }
+            // Swipe Left (Close)
+            else if (xDiff < 0 && sidebarOpen) {
+                setSidebarOpen(false);
+            }
+        }
+    };
+
     const updateConfig = async () => {
         try {
             await api.updateAiConfig(userId, aiConfig);
@@ -285,9 +329,22 @@ export default function AiAssistantView() {
     };
 
     return (
-        <div className="flex h-full w-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
+        <div 
+            className="flex h-full w-full bg-gray-50 dark:bg-gray-900 overflow-hidden relative"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
+            
+            {/* Sidebar Backdrop (Mobile) */}
+            {sidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/20 z-30 md:hidden backdrop-blur-sm"
+                    onClick={() => setSidebarOpen(false)}
+                ></div>
+            )}
+
             {/* Sidebar */}
-            <div className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 flex flex-col overflow-hidden relative`}>
+            <div className={`${sidebarOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full md:w-0 md:translate-x-0'} fixed md:relative z-40 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 flex flex-col overflow-hidden shadow-2xl md:shadow-none`}>
                 <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
                     <h2 className="font-bold text-lg dark:text-white truncate">历史对话</h2>
                 </div>
@@ -312,7 +369,6 @@ export default function AiAssistantView() {
                                 className={`w-full text-left px-4 py-3 rounded-lg text-sm truncate transition-colors ${currentDialogueId === d.id ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
                             >
                                 <div className="font-medium truncate pr-6">{d.title || "无标题对话"}</div>
-                                <div className="text-xs opacity-60 mt-1">{d.id}</div>
                             </button>
                             <button
                                 onClick={(e) => handleDeleteDialogue(e, d.id)}
@@ -340,7 +396,7 @@ export default function AiAssistantView() {
             {/* Toggle Sidebar Button (Floating) */}
             <button 
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className={`absolute top-4 ${sidebarOpen ? 'left-64' : 'left-0'} ml-2 z-20 p-2 text-gray-500 hover:text-primary transition-all`}
+                className={`absolute top-4 ${sidebarOpen ? 'left-64' : 'left-0'} ml-2 z-20 p-2 text-gray-500 hover:text-primary transition-all hidden md:block`}
             >
                 <i className={`fa-solid ${sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'}`}></i>
             </button>
@@ -417,6 +473,17 @@ export default function AiAssistantView() {
                                     value={aiConfig.api_key} 
                                     onChange={e => setAiConfig({...aiConfig, api_key: e.target.value})}
                                     className="w-full p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">OPENAI_BASE_URL</label>
+                                <input 
+                                    type="text" 
+                                    value={aiConfig.openai_base_url ?? ''} 
+                                    onChange={e => setAiConfig({...aiConfig, openai_base_url: e.target.value})}
+                                    className="w-full p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white"
+                                    placeholder="https://api.openai.com/v1"
                                 />
                             </div>
                             
@@ -499,6 +566,78 @@ export default function AiAssistantView() {
     );
 }
 
+function normalizeMarkdownText(value) {
+    if (value === null || value === undefined) return '';
+    return String(value).replace(/<br\s*\/?>/gi, '\n');
+}
+
+function remarkSoftBreakToHardBreak() {
+    return (tree) => {
+        const visit = (node) => {
+            if (!node || typeof node !== 'object') return;
+            if (node.type === 'code' || node.type === 'inlineCode') return;
+
+            if (Array.isArray(node.children)) {
+                const nextChildren = [];
+                for (const child of node.children) {
+                    if (child?.type === 'text' && typeof child.value === 'string' && child.value.includes('\n')) {
+                        const parts = child.value.split('\n');
+                        for (let i = 0; i < parts.length; i++) {
+                            if (parts[i]) nextChildren.push({ type: 'text', value: parts[i] });
+                            if (i < parts.length - 1) nextChildren.push({ type: 'break' });
+                        }
+                        continue;
+                    }
+                    visit(child);
+                    nextChildren.push(child);
+                }
+                node.children = nextChildren;
+            }
+        };
+
+        visit(tree);
+    };
+}
+
+const markdownComponents = {
+    a: (props) => (
+        <a
+            {...props}
+            target="_blank"
+            rel="noreferrer"
+            className={`break-words underline underline-offset-2 ${props.className || ''}`}
+        />
+    ),
+    pre: (props) => (
+        <pre
+            {...props}
+            className={`overflow-x-auto rounded-lg p-3 bg-gray-50 dark:bg-gray-900/40 ${props.className || ''}`}
+        />
+    ),
+    code: ({ inline, className, children, ...props }) => {
+        if (inline) {
+            return (
+                <code
+                    {...props}
+                    className={`rounded bg-gray-100 dark:bg-gray-700 px-1 py-0.5 ${className || ''}`}
+                >
+                    {children}
+                </code>
+            );
+        }
+        return (
+            <code {...props} className={className}>
+                {children}
+            </code>
+        );
+    },
+    table: ({ className, ...props }) => (
+        <div className="w-full overflow-x-auto">
+            <table {...props} className={`table-auto ${className || ''}`} />
+        </div>
+    ),
+};
+
 function MessageItem({ role, content, userId }) {
     // If content is just a string (old format or simple message)
     if (typeof content === 'string') {
@@ -511,16 +650,27 @@ function MessageItem({ role, content, userId }) {
     const isUser = role === 'user';
 
     return (
-        <div className={`flex gap-4 max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : ''}`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isUser ? 'bg-gray-200 dark:bg-gray-700 text-gray-500' : 'bg-gradient-to-br from-primary to-purple-600 text-white shadow-lg'}`}>
+        <div className={`flex gap-4 w-full md:w-auto md:max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : ''}`}>
+            <div className={`w-10 h-10 rounded-full items-center justify-center shrink-0 hidden md:flex ${isUser ? 'bg-gray-200 dark:bg-gray-700 text-gray-500' : 'bg-gradient-to-br from-primary to-purple-600 text-white shadow-lg'}`}>
                 <i className={`fa-solid ${isUser ? 'fa-user' : 'fa-robot'}`}></i>
             </div>
             
-            <div className={`space-y-2 ${isUser ? 'text-right' : 'text-left'}`}>
-                <div className={`inline-block p-4 rounded-2xl ${isUser ? 'rounded-tr-none bg-primary text-white' : 'rounded-tl-none bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-200 shadow-sm'} text-sm leading-relaxed overflow-hidden`}>
+            <div className={`space-y-2 w-full md:w-auto ${isUser ? 'text-right' : 'text-left'}`}>
+                <div className={`block md:inline-block p-4 rounded-2xl w-full md:w-auto ${isUser ? 'md:rounded-tr-none bg-primary text-white' : 'md:rounded-tl-none bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-200 shadow-sm'} text-sm leading-relaxed overflow-hidden`}>
                     {content.map((item, idx) => (
                         <div key={idx} className={item.type === 'card' ? 'my-2' : ''}>
-                            {item.type === 'text' && <div className="whitespace-pre-wrap">{item.text}</div>}
+                            {item.type === 'text' && 
+                                <div className={`${isUser ? 'text-right' : 'text-left'}`}>
+                                    <div className={`block text-left prose prose-sm max-w-none dark:prose-invert prose-code:before:content-none prose-code:after:content-none`}>
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm, remarkSoftBreakToHardBreak]}
+                                            components={markdownComponents}
+                                        >
+                                            {normalizeMarkdownText(item.text)}
+                                        </ReactMarkdown>
+                                    </div>
+                                </div>
+                            }
                             {item.type === 'card' && <CardItem card={item.data} userId={userId} />}
                         </div>
                     ))}
@@ -532,13 +682,84 @@ function MessageItem({ role, content, userId }) {
 
 function CardItem({ card, userId }) {
     const { type, data, action_id, user_confirmation } = card;
-    const [actionStatus, setActionStatus] = useState(null); // 'confirming', 'cancelling', 'confirmed', 'cancelled', 'failed'
+    const [actionStatus, setActionStatus] = useState(() => {
+        if (user_confirmation === 'Y') return 'confirmed';
+        if (user_confirmation === 'N') return 'cancelled';
+        return null;
+    }); // 'confirming', 'cancelling', 'confirmed', 'cancelled', 'failed'
+    const [subTaskDetails, setSubTaskDetails] = useState({});
+    const [longTermTaskDetails, setLongTermTaskDetails] = useState({});
 
-    // Determine initial status from card data if available
+    // Fetch details for referenced tasks (Subtasks and Long Term Tasks)
     useEffect(() => {
-        if (user_confirmation === 'Y') setActionStatus('confirmed');
-        else if (user_confirmation === 'N') setActionStatus('cancelled');
-    }, [user_confirmation]);
+        const fetchDetails = async () => {
+            // 1. Identify Subtasks to fetch
+            let subTaskIdsToFetch = new Set();
+            
+            // For Create Long Term Task (Type 4)
+            if (type === 4 && data.sub_task_ids) {
+                const ids = typeof data.sub_task_ids === 'string' 
+                    ? Object.keys(JSON.parse(data.sub_task_ids)) 
+                    : Object.keys(data.sub_task_ids);
+                ids.forEach(id => subTaskIdsToFetch.add(id));
+            }
+
+            // For Update Task (Type 3) - specifically for sub_task_ids changes
+            if (type === 3 && (data.updated?.sub_task_ids || data.original?.sub_task_ids)) {
+                const parseIds = (val) => {
+                    if (!val) return [];
+                    try {
+                        const obj = typeof val === 'string' ? JSON.parse(val) : val;
+                        return Object.keys(obj);
+                    } catch { return []; }
+                };
+
+                [...parseIds(data.updated.sub_task_ids), ...parseIds(data.original.sub_task_ids)]
+                    .forEach(id => subTaskIdsToFetch.add(id));
+            }
+
+            // 2. Identify Long Term Tasks to fetch
+            let longTermIdsToFetch = new Set();
+            if (type === 3 && (data.updated?.long_term_task_id || data.original?.long_term_task_id)) {
+                if (data.updated?.long_term_task_id) longTermIdsToFetch.add(data.updated.long_term_task_id);
+                if (data.original?.long_term_task_id) longTermIdsToFetch.add(data.original.long_term_task_id);
+            }
+
+            // 3. Fetch Subtasks
+            const subIds = Array.from(subTaskIdsToFetch);
+            if (subIds.length > 0) {
+                const details = {};
+                await Promise.all(subIds.map(async (id) => {
+                    try {
+                        const task = await api.getTaskById(id);
+                        details[id] = task;
+                    } catch (e) {
+                        console.error(`Failed to fetch task ${id}`, e);
+                        details[id] = { title: `任务 #${id}` }; 
+                    }
+                }));
+                setSubTaskDetails(prev => ({ ...prev, ...details }));
+            }
+
+            // 4. Fetch Long Term Tasks
+            const ltIds = Array.from(longTermIdsToFetch);
+            if (ltIds.length > 0) {
+                const details = {};
+                await Promise.all(ltIds.map(async (id) => {
+                    try {
+                        const task = await api.getLongTermTaskById(id);
+                        details[id] = task;
+                    } catch (e) {
+                        console.error(`Failed to fetch long term task ${id}`, e);
+                        details[id] = { title: `长期任务 #${id}` };
+                    }
+                }));
+                setLongTermTaskDetails(prev => ({ ...prev, ...details }));
+            }
+        };
+        
+        fetchDetails();
+    }, [type, data]);
 
     const handleAction = async (act) => {
         if (actionStatus) return;
@@ -578,35 +799,121 @@ function CardItem({ card, userId }) {
                         {data.due_date && <div><strong>截止:</strong> {data.due_date}</div>}
                     </div>
                 );
-            case 2: // Delete Task
+            case 2: { // Delete Task
+                const showDesc = data.description && !data.description.toString().startsWith('ID:');
                 return (
                     <div className="border-l-4 border-red-500 pl-3 py-1 bg-red-50 dark:bg-red-900/20">
                         <h4 className="font-bold text-red-700 dark:text-red-400 mb-1">⚠️ 确认删除</h4>
                         <div><strong>{data.title}</strong></div>
-                        <div>{data.description}</div>
+                        {showDesc && <div>{data.description}</div>}
                     </div>
                 );
+            }
             case 3: // Update Task
                 return (
                     <div className="border-l-4 border-blue-500 pl-3 py-1 bg-blue-50 dark:bg-blue-900/20">
                         <h4 className="font-bold text-blue-700 dark:text-blue-400 mb-1">📝 更新任务</h4>
-                        <div><strong>ID:</strong> {data.original.id}</div>
+                        {/* ID hidden as requested */}
                         <div className="mt-2 space-y-2">
                             {Object.keys(data.updated).map(key => {
-                                if (['id', 'user_id', 'created_at', 'updated_at'].includes(key)) return null;
+                                if (['id', 'user_id', 'created_at', 'updated_at', 'priority'].includes(key)) return null;
                                 const oldVal = data.original[key];
                                 const newVal = data.updated[key];
                                 if (JSON.stringify(oldVal) === JSON.stringify(newVal)) return null;
                                 
+                                if (key === 'sub_task_ids') {
+                                    let oldObj = {}, newObj = {};
+                                    try { oldObj = typeof oldVal === 'string' ? JSON.parse(oldVal) : (oldVal || {}); } catch { oldObj = {}; }
+                                    try { newObj = typeof newVal === 'string' ? JSON.parse(newVal) : (newVal || {}); } catch { newObj = {}; }
+                                    
+                                    const allIds = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+                                    
+                                    return (
+                                        <div key={key} className="text-xs">
+                                            <div className="font-bold text-gray-500">关联子任务变更</div>
+                                            <div className="mt-1 space-y-1">
+                                                {Array.from(allIds).map(id => {
+                                                    const oldWeight = oldObj[id];
+                                                    const newWeight = newObj[id];
+                                                    const task = subTaskDetails[id];
+                                                    const taskTitle = task ? task.title : `任务 #${id}`;
+                                                    
+                                                    if (oldWeight === newWeight) return null; // No change for this specific task
+                                                    
+                                                    if (oldWeight === undefined) {
+                                                        // Added
+                                                        return (
+                                                            <div key={id} className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 p-1 rounded border border-green-100 dark:border-green-800">
+                                                                <span className="text-green-600 dark:text-green-400 font-bold">+</span>
+                                                                <span className="flex-1 truncate" title={taskTitle}>{taskTitle}</span>
+                                                                <span className="text-[10px] bg-green-100 dark:bg-green-800 px-1 rounded text-green-700 dark:text-green-300">权重: {newWeight}</span>
+                                                            </div>
+                                                        );
+                                                    } else if (newWeight === undefined) {
+                                                        // Removed
+                                                        return (
+                                                            <div key={id} className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 p-1 rounded border border-red-100 dark:border-red-800">
+                                                                <span className="text-red-600 dark:text-red-400 font-bold">-</span>
+                                                                <span className="flex-1 truncate" title={taskTitle}>{taskTitle}</span>
+                                                                <span className="text-[10px] bg-red-100 dark:bg-red-800 px-1 rounded text-red-700 dark:text-red-300">权重: {oldWeight}</span>
+                                                            </div>
+                                                        );
+                                                    } else {
+                                                        // Changed
+                                                        return (
+                                                            <div key={id} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 p-1 rounded border border-blue-100 dark:border-blue-800">
+                                                                <span className="text-blue-600 dark:text-blue-400 font-bold">~</span>
+                                                                <span className="flex-1 truncate" title={taskTitle}>{taskTitle}</span>
+                                                                <span className="text-[10px] bg-blue-100 dark:bg-blue-800 px-1 rounded text-blue-700 dark:text-blue-300">{oldWeight} ➔ {newWeight}</span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                // Format values for display
+                                let displayOld = oldVal;
+                                let displayNew = newVal;
+                                let label = key;
+
+                                if (key === 'status') {
+                                    const statusMap = { 0: '未开始', 1: '未开始', 2: '进行中', 3: '已完成' };
+                                    displayOld = statusMap[oldVal] || oldVal;
+                                    displayNew = statusMap[newVal] || newVal;
+                                    label = '状态';
+                                } else if (key === 'long_term_task_id') {
+                                    const getLtTitle = (id) => {
+                                        if (!id) return '无';
+                                        const t = longTermTaskDetails[id];
+                                        return t ? t.title : `长期任务 #${id}`;
+                                    };
+                                    displayOld = getLtTitle(oldVal);
+                                    displayNew = getLtTitle(newVal);
+                                    label = '关联长期任务';
+                                } else if (key === 'title') {
+                                    label = '标题';
+                                } else if (key === 'description') {
+                                    label = '描述';
+                                } else if (key === 'due_date') {
+                                    label = '截止日期';
+                                } else if (key === 'start_date') {
+                                    label = '开始日期';
+                                } else if (key === 'progress') {
+                                    label = '进度';
+                                }
+
                                 return (
                                     <div key={key} className="text-xs">
-                                        <div className="font-bold text-gray-500">{key}</div>
+                                        <div className="font-bold text-gray-500">{label}</div>
                                         <div className="flex gap-2 mt-1">
                                             <div className="flex-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded">
-                                                - {JSON.stringify(oldVal)}
+                                                - {typeof displayOld === 'string' ? displayOld : JSON.stringify(displayOld)}
                                             </div>
                                             <div className="flex-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded">
-                                                + {JSON.stringify(newVal)}
+                                                + {typeof displayNew === 'string' ? displayNew : JSON.stringify(displayNew)}
                                             </div>
                                         </div>
                                     </div>
@@ -621,8 +928,26 @@ function CardItem({ card, userId }) {
                         <h4 className="font-bold text-purple-700 dark:text-purple-400 mb-1">🚀 创建长期任务</h4>
                         <div><strong>标题:</strong> {data.title}</div>
                         {data.sub_task_ids && (
-                            <div className="text-xs mt-1 bg-white dark:bg-gray-800 p-2 rounded border border-gray-100 dark:border-gray-700">
-                                <pre>{JSON.stringify(data.sub_task_ids, null, 2)}</pre>
+                            <div className="mt-2 space-y-1">
+                                <div className="text-xs font-bold text-gray-500">包含子任务:</div>
+                                {Object.keys(data.sub_task_ids).length > 0 ? (
+                                    Object.keys(data.sub_task_ids).map(id => {
+                                        const task = subTaskDetails[id];
+                                        const weight = data.sub_task_ids[id];
+                                        return (
+                                            <div key={id} className="text-xs bg-white dark:bg-gray-800 p-1.5 rounded border border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                                                <span className="truncate flex-1" title={task ? task.title : `任务 #${id}`}>
+                                                    {task ? task.title : '加载中...'}
+                                                </span>
+                                                <span className="text-gray-400 ml-2 text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                                                    权重: {weight}
+                                                </span>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="text-xs text-gray-400 italic">无子任务</div>
+                                )}
                             </div>
                         )}
                     </div>

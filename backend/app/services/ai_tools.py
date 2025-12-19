@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.services import crud, ai_config_service
 from app.services.ai_output_manager import OutputManager
 from app.schemas import schemas
+from app.models import models
 import datetime
 
 def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
@@ -328,6 +329,52 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm('update'))
         
         if confirmed:
+            # 同步更新子任务的关联状态
+            if sub_task_ids is not None:
+                try:
+                    print(f"DEBUG: Syncing subtasks for long_term_task {task_id}")
+                    # 1. 获取当前已关联的子任务
+                    current_subtasks = db.query(models.Task).filter(models.Task.long_term_task_id == task_id).all()
+                    current_ids = {t.id for t in current_subtasks}
+                    
+                    # 2. 获取新的子任务ID集合
+                    new_ids = set()
+                    for k in sub_task_ids.keys():
+                        try:
+                            new_ids.add(int(k))
+                        except (ValueError, TypeError):
+                            continue
+                            
+                    # 3. 计算需要添加和移除的任务
+                    to_add = new_ids - current_ids
+                    to_remove = current_ids - new_ids
+                    
+                    print(f"DEBUG: Adding subtasks: {to_add}, Removing subtasks: {to_remove}")
+                    
+                    # 4. 关联新任务
+                    for tid in to_add:
+                        task = crud.get_task_by_id(tid, db)
+                        if task:
+                            # 创建更新后的任务对象
+                            # 注意：Pydantic v2使用 model_copy, v1使用 copy
+                            updated_task_data = task.dict()
+                            updated_task_data['long_term_task_id'] = task_id
+                            task_update = schemas.Task(**updated_task_data)
+                            crud.update_task(tid, task_update, db)
+                            
+                    # 5. 解除旧任务关联
+                    for tid in to_remove:
+                        task = crud.get_task_by_id(tid, db)
+                        if task:
+                            updated_task_data = task.dict()
+                            updated_task_data['long_term_task_id'] = None
+                            task_update = schemas.Task(**updated_task_data)
+                            crud.update_task(tid, task_update, db)
+                            
+                except Exception as e:
+                    print(f"ERROR syncing subtasks: {e}")
+                    # 继续执行长期任务本身的更新，不因同步失败而完全中断
+            
             success = crud.update_long_term_task(task_id, lt_update, db)
             if success:
                 return f"长期任务 {task_id} 已更新"

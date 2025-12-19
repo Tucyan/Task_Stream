@@ -2,6 +2,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Query
 # 导入SQLAlchemy的ORM会话对象，用于数据库交互
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 # 导入类型注解：列表、可选类型
 from typing import List, Optional
 
@@ -19,6 +20,14 @@ from app.services.auth import router as auth_router
 # 创建所有数据库表（如果表不存在）
 # bind=engine 指定使用的数据库连接引擎
 models.Base.metadata.create_all(bind=engine)
+
+with engine.begin() as conn:
+    try:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(ai_configs)"))]
+        if "openai_base_url" not in cols:
+            conn.execute(text("ALTER TABLE ai_configs ADD COLUMN openai_base_url TEXT"))
+    except Exception:
+        pass
 
 # 初始化FastAPI应用实例，设置API标题
 app = FastAPI(title="Task Stream API")

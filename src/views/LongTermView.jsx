@@ -349,56 +349,110 @@ export default function LongTermView({ userId, onTaskUpdate }) {
    }
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-6 max-w-7xl mx-auto w-full">
-      {/* Filter Section - Consistent with DetailView */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="shrink-0">
-          <h2 className="text-2xl font-bold dark:text-white">长期任务</h2>
-          <p className="text-sm opacity-60 dark:text-gray-400 hidden md:block">规划您的长远目标与里程碑</p>
-        </div>
-        <div className="flex flex-1 items-center justify-end gap-3 min-w-0">
-          <div className="relative group flex-1 md:flex-none">
+    <div className="h-full min-h-0 flex flex-col gap-4 md:gap-6 max-w-7xl mx-auto w-full">
+      {/* Desktop Header - Hidden on mobile, shown on larger screens */}
+      <div className="hidden sm:flex sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-2xl font-bold dark:text-white">长期任务</h2>
+        <div className="flex items-center gap-3">
+          {/* Search - Desktop */}
+          <div className="relative group flex-none">
             <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors"></i>
-            <input type="text" value={detailSearch} onChange={(e) => setDetailSearch(e.target.value)} placeholder="搜索任务..." className="pl-10 pr-4 py-2.5 rounded-xl bg-card border border-gray-100 dark:border-gray-700 focus:ring-2 ring-primary/20 outline-none w-full md:w-64 transition-all shadow-sm dark:text-white dark:bg-gray-800" />
+            <input 
+              type="text" 
+              value={detailSearch} 
+              onChange={(e) => setDetailSearch(e.target.value)} 
+              placeholder="搜索任务..." 
+              className="pl-10 pr-4 py-2.5 rounded-xl bg-card border border-gray-100 dark:border-gray-700 focus:ring-2 ring-primary/20 outline-none w-64 transition-all shadow-sm dark:text-white dark:bg-gray-800" 
+            />
           </div>
-          <button onClick={handleAddTask} className="bg-primary text-white px-4 py-2.5 rounded-xl shadow-lg shadow-primary/30 hover:brightness-110 transition-all flex items-center gap-2 shrink-0">
-            <i className="fa-solid fa-plus"></i> <span className="hidden sm:inline">新建目标</span>
+          <button onClick={handleAddTask} className="bg-primary text-white px-4 py-2.5 rounded-lg shadow-lg shadow-primary/30 hover:brightness-110 transition-all flex items-center gap-2 shrink-0">
+            <i className="fa-solid fa-plus"></i>
+            <span>新建目标</span>
           </button>
         </div>
       </div>
 
-      <div className="bg-card rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-          <div className="flex items-center gap-2 bg-gray-50 dark:bg-black/20 p-2 rounded-xl border border-gray-200 dark:border-gray-700 w-full sm:w-auto">
-            <i className="fa-regular fa-calendar text-gray-400 dark:text-gray-300 ml-2 shrink-0"></i>
-            <input type="date" value={filterDateStart} onChange={(e) => setFilterDateStart(e.target.value)} className="bg-transparent border-none outline-none text-sm w-full sm:w-32 text-gray-600 dark:text-gray-300 min-w-0" />
-            <span className="text-gray-400 dark:text-gray-300 shrink-0">-</span>
-            <input type="date" value={filterDateEnd} onChange={(e) => setFilterDateEnd(e.target.value)} className="bg-transparent border-none outline-none text-sm w-full sm:w-32 text-gray-600 dark:text-gray-300 min-w-0" />
-            <button onClick={() => {setFilterDateStart(''); setFilterDateEnd('')}} className={`text-xs text-red-400 hover:text-red-600 whitespace-nowrap px-2 border-l border-gray-300 dark:border-gray-600 ml-1 ${(filterDateStart || filterDateEnd) ? '' : 'invisible pointer-events-none'}`}>清除</button>
-          </div>
+      {/* Mobile Search Bar - Shows on mobile with integrated add button */}
+      <div className="sm:hidden flex items-center gap-2">
+        <div className="relative group flex-1">
+          <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors"></i>
+          <input 
+            type="text" 
+            value={detailSearch} 
+            onChange={(e) => setDetailSearch(e.target.value)} 
+            placeholder="搜索长期任务..." 
+            className="pl-10 pr-4 py-2.5 rounded-xl bg-card border border-gray-100 dark:border-gray-700 focus:ring-2 ring-primary/20 outline-none w-full transition-all shadow-sm dark:text-white dark:bg-gray-800" 
+          />
         </div>
-        <div className="flex bg-gray-100 dark:bg-black/20 p-1 rounded-xl w-full lg:w-auto">
-          <button onClick={() => setDetailFilter('all')} className={`flex-1 lg:flex-none justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${detailFilter === 'all' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+        <button onClick={handleAddTask} className="bg-primary text-white px-3 py-2.5 rounded-lg shadow-lg shadow-primary/30 hover:brightness-110 transition-all flex items-center gap-2 shrink-0">
+          <i className="fa-solid fa-plus"></i>
+        </button>
+      </div>
+
+      {/* Filter Section */}
+      <div className="bg-card rounded-xl md:rounded-2xl p-3 md:p-4 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row gap-3">
+        {/* Date Filter - Left-aligned in wide screens */}
+        <div className="flex items-center gap-2 bg-gray-50 dark:bg-black/20 p-2 rounded-lg border border-gray-200 dark:border-gray-700 w-full sm:w-96 sm:mr-auto">
+          <i className="fa-regular fa-calendar text-gray-400 dark:text-gray-300 ml-2 shrink-0"></i>
+          <input 
+            type="date" 
+            value={filterDateStart} 
+            onChange={(e) => setFilterDateStart(e.target.value)} 
+            className="bg-transparent border-none outline-none text-sm flex-1 text-gray-600 dark:text-gray-300 min-w-0" 
+          />
+          <span className="text-gray-400 dark:text-gray-300 shrink-0 text-xs">至</span>
+          <input 
+            type="date" 
+            value={filterDateEnd} 
+            onChange={(e) => setFilterDateEnd(e.target.value)} 
+            className="bg-transparent border-none outline-none text-sm flex-1 text-gray-600 dark:text-gray-300 min-w-0" 
+          />
+          <button 
+            onClick={() => {setFilterDateStart(''); setFilterDateEnd('')}} 
+            className={`text-xs text-red-400 hover:text-red-600 whitespace-nowrap px-2 border-l border-gray-300 dark:border-gray-600 ml-1 ${(filterDateStart || filterDateEnd) ? '' : 'invisible pointer-events-none'}`}
+          >
+            清除
+          </button>
+        </div>
+        
+        {/* Status Filter - Right-aligned in wide screens */}
+        <div className="flex bg-gray-100 dark:bg-black/20 p-1 rounded-lg w-full sm:w-80 sm:ml-auto">
+          <button 
+            onClick={() => setDetailFilter('all')} 
+            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-1 ${detailFilter === 'all' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          >
             <span>全部</span>
-            <span className={`bg-gray-200 dark:bg-gray-600 text-[10px] px-1.5 py-0.5 rounded-full ${detailFilter === 'all' ? 'bg-primary/10 text-primary' : ''}`}>{baseFilteredTasks.length}</span>
+            <span className={`bg-gray-200 dark:bg-gray-600 text-[10px] px-1.5 py-0.5 rounded-full ${detailFilter === 'all' ? 'bg-primary/10 text-primary' : ''}`}>
+              {baseFilteredTasks.length}
+            </span>
           </button>
-          <button onClick={() => setDetailFilter('pending')} className={`flex-1 lg:flex-none justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${detailFilter === 'pending' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+          <button 
+            onClick={() => setDetailFilter('pending')} 
+            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-1 ${detailFilter === 'pending' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          >
             <span>进行中</span>
-            <span className={`bg-gray-200 dark:bg-gray-600 text-[10px] px-1.5 py-0.5 rounded-full ${detailFilter === 'pending' ? 'bg-primary/10 text-primary' : ''}`}>{baseFilteredTasks.filter(t => !t.completed).length}</span>
+            <span className={`bg-gray-200 dark:bg-gray-600 text-[10px] px-1.5 py-0.5 rounded-full ${detailFilter === 'pending' ? 'bg-primary/10 text-primary' : ''}`}>
+              {baseFilteredTasks.filter(t => !t.completed).length}
+            </span>
           </button>
-          <button onClick={() => setDetailFilter('completed')} className={`flex-1 lg:flex-none justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${detailFilter === 'completed' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+          <button 
+            onClick={() => setDetailFilter('completed')} 
+            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-1 ${detailFilter === 'completed' ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          >
             <span>已达成</span>
-            <span className={`bg-gray-200 dark:bg-gray-600 text-[10px] px-1.5 py-0.5 rounded-full ${detailFilter === 'completed' ? 'bg-primary/10 text-primary' : ''}`}>{baseFilteredTasks.filter(t => t.completed).length}</span>
+            <span className={`bg-gray-200 dark:bg-gray-600 text-[10px] px-1.5 py-0.5 rounded-full ${detailFilter === 'completed' ? 'bg-primary/10 text-primary' : ''}`}>
+              {baseFilteredTasks.filter(t => t.completed).length}
+            </span>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+      <div className="flex-1 overflow-y-auto pr-2 space-y-4 md:space-y-6">
         {displayTasks.map((task) => (
-          <div key={task.id} className="bg-card rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md hover:border-primary/30 transition-all group relative overflow-hidden">
-            <div className="flex gap-4">
-               {/* Progress Circle/Icon */}
-              <div className="mt-1 w-10 h-10 rounded-full border-4 border-gray-100 dark:border-gray-600 flex items-center justify-center shrink-0 relative">
+          <div key={task.id} className="bg-card rounded-xl md:rounded-2xl p-3 md:p-4 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md hover:border-primary/30 transition-all group relative overflow-hidden">
+            <div className="flex gap-3 md:gap-4">
+               {/* Progress Circle/Icon - Smaller on mobile */}
+              <div className="mt-1 w-8 h-8 md:w-10 md:h-10 rounded-full border-3 md:border-4 border-gray-100 dark:border-gray-600 flex items-center justify-center shrink-0 relative">
                  <svg className="w-full h-full absolute inset-0 transform -rotate-90" viewBox="0 0 36 36">
                     <path
                       className="text-gray-100 dark:text-gray-600"
@@ -416,71 +470,71 @@ export default function LongTermView({ userId, onTaskUpdate }) {
                       strokeWidth="3"
                     />
                  </svg>
-                 <span className="text-[10px] font-bold text-primary">{Math.round(task.progress)}%</span>
+                 <span className="text-[9px] md:text-[10px] font-bold text-primary">{Math.round(task.progress)}%</span>
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h4 className={`text-lg font-bold dark:text-white ${task.completed ? 'line-through opacity-50' : ''}`}>{task.title}</h4>
-                    <p className={`text-sm text-gray-500 dark:text-gray-400 line-clamp-1 ${task.completed ? 'opacity-50' : ''}`}>{task.desc}</p>
+                <div className="flex justify-between items-start mb-1 md:mb-2">
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`text-sm md:text-base lg:text-lg font-bold dark:text-white ${task.completed ? 'line-through opacity-50' : ''}`}>{task.title}</h4>
+                    <p className={`text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-1 md:line-clamp-2 ${task.completed ? 'opacity-50' : ''}`}>{task.desc}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity mr-1">
-                      <button onClick={() => handleEditTask(task)} className="w-8 h-8 rounded-full hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-primary transition-all" title="编辑">
-                        <i className="fa-solid fa-pen-to-square"></i>
+                  <div className="flex items-center gap-1 md:gap-2 ml-2">
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => handleEditTask(task)} className="w-7 h-7 md:w-8 md:h-8 rounded-full hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-primary transition-all" title="编辑">
+                        <i className="fa-solid fa-pen-to-square text-sm md:text-base"></i>
                       </button>
-                      <button onClick={() => handleDeleteTask(task.id)} className="w-8 h-8 rounded-full hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all" title="删除">
-                        <i className="fa-regular fa-trash-can"></i>
+                      <button onClick={() => handleDeleteTask(task.id)} className="w-7 h-7 md:w-8 md:h-8 rounded-full hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all" title="删除">
+                        <i className="fa-regular fa-trash-can text-sm md:text-base"></i>
                       </button>
                     </div>
                     <button 
                       onClick={() => toggleExpand(task.id)}
-                      className={`w-8 h-8 rounded-full bg-gray-50 dark:bg-black/20 flex items-center justify-center text-gray-500 hover:text-primary hover:bg-primary/10 transition-all ${expandedTasks[task.id] ? 'rotate-180' : ''}`}
+                      className={`w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-50 dark:bg-black/20 flex items-center justify-center text-gray-500 hover:text-primary hover:bg-primary/10 transition-all ${expandedTasks[task.id] ? 'rotate-180' : ''}`}
                     >
-                      <i className="fa-solid fa-chevron-down"></i>
+                      <i className="fa-solid fa-chevron-down text-sm md:text-base"></i>
                     </button>
                   </div>
                 </div>
                 
-                <div className="flex flex-wrap items-center gap-2 mb-3">
+                <div className="flex flex-wrap items-center gap-1 md:gap-2 mb-2 md:mb-3">
                   {task.tags.map((tag) => (
-                    <span key={tag} className="px-2 py-0.5 bg-primary/5 text-primary rounded-md text-[10px] font-medium border border-primary/10">#{tag}</span>
+                    <span key={tag} className="px-1.5 py-0.5 md:px-2 md:py-0.5 bg-primary/5 text-primary rounded text-[9px] md:text-[10px] font-medium border border-primary/10">#{tag}</span>
                   ))}
                 </div>
 
-                {/* Subtasks Section - Expandable */}
-                <div className={`grid transition-all duration-300 ease-in-out ${expandedTasks[task.id] ? 'grid-rows-[1fr] opacity-100 mt-4' : 'grid-rows-[0fr] opacity-0'}`}>
+                {/* Subtasks Section - Expandable - Mobile optimized */}
+                <div className={`grid transition-all duration-300 ease-in-out ${expandedTasks[task.id] ? 'grid-rows-[1fr] opacity-100 mt-3 md:mt-4' : 'grid-rows-[0fr] opacity-0'} -ml-10 md:-ml-14 w-[calc(100%+2.5rem)] md:w-[calc(100%+3.5rem)] md:ml-0 md:w-auto`}>
                   <div className="overflow-hidden">
-                    <div className="bg-gray-50 dark:bg-black/20 rounded-xl p-3 space-y-2">
-                        <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 pl-1">子任务清单</div>
+                    <div className="bg-gray-50 dark:bg-black/20 rounded-lg md:rounded-xl p-2 md:p-3 space-y-1 md:space-y-2">
+                        <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 md:mb-2 pl-1">子任务清单</div>
                         {task.subTasks.map(sub => (
-                            <div key={sub.id} className="group/sub flex items-center gap-3 p-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm hover:border-primary/30 transition-all">
+                            <div key={sub.id} className="group/sub flex items-center gap-2 md:gap-3 p-1.5 md:p-2 bg-white dark:bg-gray-700/50 rounded-md md:rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm hover:border-primary/30 transition-all">
                                 <div 
                                   onClick={() => toggleSubTask(sub.id)}
-                                  className={`w-4 h-4 rounded border cursor-pointer flex items-center justify-center transition-colors ${sub.completed ? 'bg-primary border-primary' : 'border-gray-300 dark:border-gray-600 hover:border-primary'}`}
+                                  className={`w-3.5 h-3.5 md:w-4 md:h-4 rounded border cursor-pointer flex items-center justify-center transition-colors ${sub.completed ? 'bg-primary border-primary' : 'border-gray-300 dark:border-gray-600 hover:border-primary'}`}
                                 >
-                                    {sub.completed && <i className="fa-solid fa-check text-white text-[8px]"></i>}
+                                    {sub.completed && <i className="fa-solid fa-check text-white text-[7px] md:text-[8px]"></i>}
                                 </div>
-                                <div className="flex-1">
-                                    <span className={`text-sm ${sub.completed ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>{sub.title}</span>
+                                <div className="flex-1 min-w-0">
+                                    <div className={`text-xs md:text-sm ${sub.completed ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>{sub.title}</div>
                                     {task.sub_task_ids && task.sub_task_ids[sub.id] && (
-                                        <span className="ml-2 text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                                        <div className="mt-0.5 text-[10px] md:text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded inline-block">
                                             权重: {task.sub_task_ids[sub.id]}
-                                        </span>
+                                        </div>
                                     )}
                                 </div>
-                                <div className="flex gap-2 opacity-0 group-hover/sub:opacity-100 transition-opacity">
+                                <div className="flex gap-1 md:gap-2 opacity-0 group-hover/sub:opacity-100 transition-opacity">
                                   <button 
                                     onClick={() => handleEditSubtask(sub.id, task.id)}
-                                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-primary transition-colors text-xs"
+                                    className="p-1 md:p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-md md:rounded-lg text-gray-400 hover:text-primary transition-colors text-[10px] md:text-xs"
                                     title="编辑"
                                   >
                                     <i className="fa-solid fa-pen-to-square"></i>
                                   </button>
                                   <button 
                                     onClick={() => handleDeleteSubtask(sub.id, task.id)}
-                                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-red-500 transition-colors text-xs"
+                                    className="p-1 md:p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-md md:rounded-lg text-gray-400 hover:text-red-500 transition-colors text-[10px] md:text-xs"
                                     title="删除"
                                   >
                                     <i className="fa-regular fa-trash-can"></i>
@@ -490,7 +544,7 @@ export default function LongTermView({ userId, onTaskUpdate }) {
                         ))}
                          <button 
                            onClick={() => handleAddSubtask(task.id)}
-                           className="w-full py-2 text-xs text-gray-400 hover:text-primary border border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-1"
+                           className="w-full py-1.5 md:py-2 text-xs text-gray-400 hover:text-primary border border-dashed border-gray-300 dark:border-gray-600 rounded-md md:rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-1"
                          >
                             <i className="fa-solid fa-plus"></i> <span className="hidden sm:inline">添加子任务</span><span className="sm:hidden">添加</span>
                         </button>

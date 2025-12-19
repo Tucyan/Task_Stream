@@ -5,7 +5,8 @@ import taskEventBus from '../utils/eventBus'
 export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgencyClass, onAddTask, onDeleteTask, userId }) {
   const [urgentTasks, setUrgentTasks] = useState([])
   const [urgentPage, setUrgentPage] = useState(0)
-  const PAGE_SIZE = 3
+  const [pageSize, setPageSize] = useState(3)
+  const containerRef = useRef(null)
 
   useEffect(() => {
     const fetchUrgent = () => {
@@ -27,8 +28,45 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
     }
   }, [userId])
 
-  const totalPages = Math.ceil(urgentTasks.length / PAGE_SIZE)
-  const pagedUrgentTasks = urgentTasks.slice(urgentPage * PAGE_SIZE, (urgentPage + 1) * PAGE_SIZE)
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const calculatePageSize = () => {
+      if (!containerRef.current) return
+      const height = containerRef.current.clientHeight
+      const padding = 48 // p-6 (24px) * 2
+      const gap = 16     // gap-4 (16px)
+      const minCardHeight = 100 // 最小卡片高度
+      
+      const availableHeight = height - padding
+      // Calculation: n * minH + (n-1) * gap <= availableH
+      // => n * (minH + gap) - gap <= availableH
+      // => n * (minH + gap) <= availableH + gap
+      // => n <= (availableH + gap) / (minH + gap)
+      
+      const n = Math.floor((availableHeight + gap) / (minCardHeight + gap))
+      setPageSize(Math.max(1, n))
+    }
+
+    const observer = new ResizeObserver(() => {
+      window.requestAnimationFrame(calculatePageSize)
+    })
+    
+    observer.observe(containerRef.current)
+    calculatePageSize()
+    
+    return () => observer.disconnect()
+  }, [])
+
+  const totalPages = Math.ceil(urgentTasks.length / pageSize) || 1
+  
+  useEffect(() => {
+    if (urgentPage >= totalPages) {
+      setUrgentPage(Math.max(0, totalPages - 1))
+    }
+  }, [pageSize, totalPages])
+
+  const pagedUrgentTasks = urgentTasks.slice(urgentPage * pageSize, (urgentPage + 1) * pageSize)
 
   const handlePrevUrgent = () => setUrgentPage(p => Math.max(0, p - 1))
   const handleNextUrgent = () => setUrgentPage(p => Math.min(totalPages - 1, p + 1))
@@ -180,7 +218,7 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
         </div>
 
         {/* Urgent Tasks */}
-        <div className="flex-1 bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col relative group justify-center min-h-[200px] md:min-h-0">
+        <div ref={containerRef} className="flex-1 bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col relative group justify-center min-h-[200px] md:min-h-0">
           {/* 左切换按钮 */}
           <button  
             onClick={handlePrevUrgent} 
@@ -197,7 +235,7 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
             <i className="fa-solid fa-angle-right"></i>
           </button>
 
-          <div className="space-y-4 w-full px-2">
+          <div className="w-full px-2 flex flex-col gap-4 flex-1 min-h-0">
             {pagedUrgentTasks.map(task => {
   const now = new Date()
   const end = new Date(task.due_date)
@@ -219,7 +257,7 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
   return (
     <div
       key={task.id}
-      className={`rounded-2xl p-4 flex flex-col items-center justify-between border-2 shadow-sm transition-all text-white ${cardClass}`}
+      className={`rounded-2xl p-4 flex flex-col items-center justify-between border-2 shadow-sm transition-all text-white flex-1 ${cardClass}`}
     >
       <div className="mb-2 font-bold text-2xl tracking-wider drop-shadow-md">
         {getRemainTime(task.due_date)}

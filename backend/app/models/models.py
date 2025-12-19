@@ -71,6 +71,7 @@ class AIConfig(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     api_key = Column(Text, nullable=False)
     model = Column(Text, nullable=False)
+    openai_base_url = Column(Text, nullable=True, default="")
     prompt = Column(Text, nullable=True)
     character = Column(Text, nullable=True)
     long_term_memory = Column(Text, nullable=True)

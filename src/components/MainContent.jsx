@@ -81,7 +81,7 @@ export default function MainContent({
 }) {
   return (
     <div className="flex-1 min-h-0 flex flex-col relative bg-page transition-colors duration-300">
-      <div className={`flex-1 min-h-0 ${currentView === 'settings' ? 'p-0' : 'p-4 pt-8'} md:p-8 md:pt-2`}>
+      <div className={`flex-1 min-h-0 ${currentView === 'settings' || currentView === 'ai' || currentView === 'journal' ? 'p-0' : 'p-4 pt-8'} md:p-8 md:pt-2`}>
         {currentView === 'home' && (
           <HomeView 
             todayTasks={todayTasks} 

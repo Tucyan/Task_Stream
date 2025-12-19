@@ -86,10 +86,10 @@ export default function JournalView({ userId }) {
     setIsCalendarOpen(false) // Close calendar after selection on mobile
   }
   return (
-    <div className="h-full flex flex-col md:flex-row gap-4 md:gap-6 max-w-7xl mx-auto relative">
+    <div className="h-full flex flex-col md:flex-row gap-4 md:gap-6 md:max-w-7xl mx-auto relative">
       {/* Mobile Calendar Toggle Header */}
       <div 
-        className="md:hidden flex items-center justify-between bg-card rounded-2xl p-4 shadow-sm cursor-pointer border border-gray-100 dark:border-gray-700"
+        className="md:hidden flex items-center justify-between bg-card rounded-2xl p-4 shadow-sm cursor-pointer border border-gray-100 dark:border-gray-700 mt-2"
         onClick={() => setIsCalendarOpen(!isCalendarOpen)}
       >
         <div className="flex items-center gap-2 dark:text-white">
@@ -102,7 +102,7 @@ export default function JournalView({ userId }) {
 
       <div className={`
         md:w-80 bg-card rounded-3xl p-6 shadow-sm flex flex-col md:flex
-        fixed md:static inset-x-4 top-20 z-50 md:z-auto
+        fixed md:static inset-x-0 top-20 z-50 md:z-auto
         transition-all duration-300 origin-top
         ${isCalendarOpen ? 'scale-y-100 opacity-100' : 'scale-y-0 opacity-0 md:scale-y-100 md:opacity-100 hidden md:flex'}
         border border-gray-100 dark:border-gray-700 md:border-none
@@ -163,11 +163,11 @@ export default function JournalView({ userId }) {
         ></div>
       )}
 
-      <div className="flex-1 bg-card rounded-3xl p-6 md:p-8 shadow-sm flex flex-col relative overflow-hidden h-[calc(100vh-140px)] md:h-auto">
+      <div className="flex-1 bg-card rounded-3xl p-4 md:p-8 shadow-sm flex flex-col relative overflow-hidden h-[calc(100vh-140px)] md:h-auto">
         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
           <i className="fa-solid fa-feather text-9xl"></i>
         </div>
-        <div className="flex justify-between items-end mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
+        <div className="flex justify-between items-end mb-4 md:mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
           <div>
             <h2 className="text-3xl font-bold text-primary">{month + 1}月 {selectedDay}日</h2>
             <p className="text-sm opacity-60 mt-1 dark:text-gray-400">记录此刻的想法...</p>
@@ -183,14 +183,14 @@ export default function JournalView({ userId }) {
           </div>
         </div>
         {isPreview ? (
-          <div className="flex-1 w-full overflow-y-auto p-4 prose dark:prose-invert max-w-none">
+          <div className="flex-1 w-full overflow-y-auto p-2 md:p-4 prose dark:prose-invert max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{journalContent}</ReactMarkdown>
           </div>
         ) : (
           <textarea 
             value={journalContent} 
             onChange={(e) => setJournalContent(e.target.value)} 
-            className="flex-1 w-full bg-transparent border-none outline-none resize-none font-mono text-base leading-relaxed p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:bg-gray-50 dark:focus:bg-gray-800 focus:ring-0 dark:text-gray-200" 
+            className="flex-1 w-full bg-transparent border-none outline-none resize-none font-mono text-base leading-relaxed p-2 md:p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:bg-gray-50 dark:focus:bg-gray-800 focus:ring-0 dark:text-gray-200" 
             placeholder="# 今日总结\n\n- 完成了 Task Stream 的原型设计\n- 学习了 Vue3 的新特性\n\n感觉效率很高，明天继续保持。" 
           />
         )}

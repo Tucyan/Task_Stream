@@ -8,11 +8,15 @@ from app.services import ai_config_service
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
-# 计算.env.production文件路径（Task_Stream根目录）
-# 当前文件: backend/app/services/ai_agent.py
-# .env.production: Task_Stream/.env.production
-env_path = Path(__file__).resolve().parents[3] / ".env.production"
-load_dotenv(env_path)
+root_dir = Path(__file__).resolve().parents[3]
+env_dev_path = root_dir / ".env.development"
+env_prod_path = root_dir / ".env.production"
+if env_dev_path.exists():
+    load_dotenv(env_dev_path)
+elif env_prod_path.exists():
+    load_dotenv(env_prod_path)
+else:
+    load_dotenv()
 
 def init_agent_executor(user_id: int, db: Session, tools):
     """
@@ -31,9 +35,9 @@ def init_agent_executor(user_id: int, db: Session, tools):
     # 获取API密钥，优先使用用户配置，其次使用环境变量
     api_key = config.api_key if (config and config.api_key) else os.getenv("OPENAI_API_KEY")
     # 获取API基础URL，默认使用阿里云DashScope兼容模式
-    base_url = os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-    # 获取模型名称，优先使用用户配置，其次使用默认模型
-    model_name = config.model if (config and config.model) else "qwen-max"
+    base_url = config.openai_base_url if (config and config.openai_base_url) else os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    # 获取模型名称，优先使用用户配置，其次使用环境变量，最后默认qwen-max
+    model_name = config.model if (config and config.model) else os.getenv("OPENAI_MODEL", "qwen-max")
     
     print(f"DEBUG: initializing agent. Model: {model_name}, BaseURL: {base_url}")
     print(f"DEBUG: API Key loaded: {'Yes' if api_key else 'No'} ({api_key[:5]}... if present)")
@@ -46,7 +50,9 @@ def init_agent_executor(user_id: int, db: Session, tools):
         model=model_name,
         api_key=api_key,
         base_url=base_url,
-        streaming=True
+        streaming=True,
+        max_retries=3,
+        timeout=60.0
     )
     
     character = config.character if (config and config.character) else "默认"

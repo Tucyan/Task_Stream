@@ -1,10 +1,19 @@
 import asyncio
 import json
 import uuid
+import os
 from sqlalchemy.orm import Session
 from app.services import ai_agent, ai_tools, ai_output_manager, ai_config_service
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 from app.core.database import SessionLocal
+
+def _get_context_window_turns() -> int:
+    raw = os.getenv("AI_CONTEXT_WINDOW_TURNS", "5")
+    try:
+        value = int(raw)
+    except Exception:
+        value = 5
+    return max(value, 0)
 
 def map_card_to_tool(card_type, card_data):
     """根据卡片类型和数据，推断工具名称和参数"""
@@ -86,7 +95,12 @@ async def run_chat_stream(user_id: int, dialogue_id: int, content: str):
             if dialogue and dialogue.messages:
                 # dialogue.messages 是 List[List[dict]] (schemas.AiMessage 中的定义)
                 # 或者是 List[List[ChatTurn]]
-                for turn_list in dialogue.messages:
+                turn_lists = dialogue.messages
+                max_turns = _get_context_window_turns()
+                if max_turns and len(turn_lists) > max_turns:
+                    turn_lists = turn_lists[-max_turns:]
+
+                for turn_list in turn_lists:
                     for msg in turn_list:
                         # msg 是 dict
                         role = msg.get('role')

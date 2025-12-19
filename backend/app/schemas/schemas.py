@@ -119,6 +119,7 @@ class AIConfigBase(BaseModel):
     user_id: int
     api_key: str
     model: str
+    openai_base_url: Optional[str] = ""
     prompt: Optional[str] = None
     character: Optional[str] = None
     long_term_memory: Optional[str] = None
@@ -136,6 +137,7 @@ class AIConfigCreate(AIConfigBase):
 class AIConfigUpdate(BaseModel):
     api_key: Optional[str] = None
     model: Optional[str] = None
+    openai_base_url: Optional[str] = None
     prompt: Optional[str] = None
     character: Optional[str] = None
     long_term_memory: Optional[str] = None

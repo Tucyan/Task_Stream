@@ -5,6 +5,25 @@ export default function MobileNav({ currentView, setCurrentView, primaryColor, u
   const [showHeatmap, setShowHeatmap] = useState(false)
   const [heatmapDate, setHeatmapDate] = useState(new Date())
   const [heatmapData, setHeatmapData] = useState([])
+  
+  // Auto-scale logic
+  const [scale, setScale] = useState(1)
+  const MIN_REQUIRED_WIDTH = 370 // 7 buttons * ~50px + padding
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth
+      if (width < MIN_REQUIRED_WIDTH) {
+        setScale(width / MIN_REQUIRED_WIDTH)
+      } else {
+        setScale(1)
+      }
+    }
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const year = heatmapDate.getFullYear()
   const month = heatmapDate.getMonth()
@@ -119,41 +138,48 @@ export default function MobileNav({ currentView, setCurrentView, primaryColor, u
       )}
 
       {/* Main Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 order-last">
-        <div className="flex gap-1 flex-1 justify-between sm:justify-start sm:gap-4 overflow-x-auto no-scrollbar mr-2">
-          <button onClick={() => setCurrentView('home')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 min-w-[3rem] ${navClass('home')}`}>
+      <div className="flex items-center justify-center px-2 py-2 order-last overflow-hidden">
+        <div 
+          className="flex justify-between"
+          style={{
+            transform: `scale(${scale})`,
+            width: scale < 1 ? `${MIN_REQUIRED_WIDTH}px` : '100%',
+            transformOrigin: 'center center'
+          }}
+        >
+          <button onClick={() => setCurrentView('home')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 w-12 shrink-0 ${navClass('home')}`}>
             <i className="fa-solid fa-house text-lg"></i>
-            <span className="text-[10px]">主页</span>
+            <span className="text-[10px] whitespace-nowrap">主页</span>
           </button>
-          <button onClick={() => setCurrentView('detail')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 min-w-[3rem] ${navClass('detail')}`}>
+          <button onClick={() => setCurrentView('detail')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 w-12 shrink-0 ${navClass('detail')}`}>
             <i className="fa-solid fa-list-check text-lg"></i>
-            <span className="text-[10px]">日程</span>
+            <span className="text-[10px] whitespace-nowrap">日程</span>
           </button>
-          <button onClick={() => setCurrentView('longterm')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 min-w-[3rem] ${navClass('longterm')}`}>
+          <button onClick={() => setCurrentView('longterm')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 w-12 shrink-0 ${navClass('longterm')}`}>
             <i className="fa-solid fa-timeline text-lg"></i>
-            <span className="text-[10px]">长期</span>
+            <span className="text-[10px] whitespace-nowrap">长期</span>
           </button>
-          <button onClick={() => setCurrentView('journal')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 min-w-[3rem] ${navClass('journal')}`}>
+          <button onClick={() => setCurrentView('journal')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 w-12 shrink-0 ${navClass('journal')}`}>
             <i className="fa-solid fa-book-open text-lg"></i>
-            <span className="text-[10px]">日志</span>
+            <span className="text-[10px] whitespace-nowrap">日志</span>
           </button>
-          <button onClick={() => setCurrentView('ai')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 min-w-[3rem] ${navClass('ai')}`}>
+          <button onClick={() => setCurrentView('ai')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 w-12 shrink-0 ${navClass('ai')}`}>
             <i className="fa-solid fa-wand-magic-sparkles text-lg"></i>
-            <span className="text-[10px]">AI</span>
+            <span className="text-[10px] whitespace-nowrap">AI</span>
           </button>
-          <button onClick={() => setCurrentView('settings')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 min-w-[3rem] ${navClass('settings')}`}>
+          <button onClick={() => setCurrentView('settings')} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 w-12 shrink-0 ${navClass('settings')}`}>
             <i className="fa-solid fa-sliders text-lg"></i>
-            <span className="text-[10px]">设置</span>
+            <span className="text-[10px] whitespace-nowrap">设置</span>
           </button>
           
           <div className="w-px h-8 bg-gray-200 dark:bg-gray-700 mx-1 self-center shrink-0"></div>
 
           <button 
             onClick={() => setShowHeatmap(!showHeatmap)} 
-            className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 min-w-[3rem] ${showHeatmap ? 'text-primary bg-primary/10' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10'}`}
+            className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 w-12 shrink-0 ${showHeatmap ? 'text-primary bg-primary/10' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10'}`}
           >
             <i className={`fa-solid ${showHeatmap ? 'fa-chevron-down' : 'fa-fire'} text-lg`}></i>
-            <span className="text-[10px]">热力</span>
+            <span className="text-[10px] whitespace-nowrap">热力</span>
           </button>
         </div>
       </div>

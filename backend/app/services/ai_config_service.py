@@ -33,6 +33,7 @@ def create_ai_config(db: Session, config: schemas.AIConfigCreate):
         user_id=config.user_id,
         api_key=config.api_key,
         model=config.model,
+        openai_base_url=config.openai_base_url,
         prompt=config.prompt,
         character=config.character,
         long_term_memory=config.long_term_memory,

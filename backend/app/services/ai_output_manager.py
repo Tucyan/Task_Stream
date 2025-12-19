@@ -160,6 +160,10 @@ class OutputManager:
             "event": "cards", 
             "data": json.dumps({"cards": [card_data]})
         })
+        
+        # 强制交出控制权，确保 SSE 消费者有机会立即发送卡片
+        # 特别是在自动确认开启时，后续可能会立即执行阻塞的 CRUD 操作
+        await asyncio.sleep(0)
 
         if not need_confirm:
             return True
