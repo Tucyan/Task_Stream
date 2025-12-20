@@ -2,6 +2,32 @@ import React, { useEffect, useMemo, useState } from 'react'
 import * as api from '../services/api.js'
 
 const REMINDER_TYPES = ['Message', 'Task', 'LongTermTask']
+const REMINDER_SETTINGS_KEY = 'taskStreamReminderSettings'
+const DEFAULT_REMINDER_SETTINGS = { vibration: true, sound: true, snooze_minutes: 10 }
+
+function loadReminderSettings() {
+  if (typeof window === 'undefined') return { ...DEFAULT_REMINDER_SETTINGS }
+  try {
+    const raw = localStorage.getItem(REMINDER_SETTINGS_KEY)
+    const parsed = raw ? JSON.parse(raw) : null
+    const snooze_minutes = Number(parsed?.snooze_minutes)
+    return {
+      vibration: parsed?.vibration !== false,
+      sound: parsed?.sound !== false,
+      snooze_minutes: Number.isFinite(snooze_minutes) && snooze_minutes > 0 ? Math.min(180, Math.floor(snooze_minutes)) : 10
+    }
+  } catch {
+    return { ...DEFAULT_REMINDER_SETTINGS }
+  }
+}
+
+function saveReminderSettings(next) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(REMINDER_SETTINGS_KEY, JSON.stringify(next))
+  } catch {
+  }
+}
 
 function toDatetimeLocalValue(time) {
   if (!time || typeof time !== 'string') return ''
@@ -77,6 +103,7 @@ export default function ReminderQueueModal({ visible, onClose, userId, onSaved }
   const [items, setItems] = useState([])
   const [activeTab, setActiveTab] = useState('list')
   const [jsonDraft, setJsonDraft] = useState('')
+  const [reminderSettings, setReminderSettings] = useState(DEFAULT_REMINDER_SETTINGS)
 
   const itemCountLabel = useMemo(() => `${Array.isArray(items) ? items.length : 0} 条`, [items])
 
@@ -86,6 +113,7 @@ export default function ReminderQueueModal({ visible, onClose, userId, onSaved }
     let cancelled = false
     setLoading(true)
     setError('')
+    setReminderSettings(loadReminderSettings())
     api
       .getReminderList(userId)
       .then((list) => {
@@ -114,6 +142,20 @@ export default function ReminderQueueModal({ visible, onClose, userId, onSaved }
   }, [activeTab, items, visible])
 
   if (!visible) return null
+
+  const patchSettings = (patch) => {
+    setReminderSettings((prev) => {
+      const nextRaw = { ...(prev || DEFAULT_REMINDER_SETTINGS), ...(patch || {}) }
+      const snooze_minutes = Number(nextRaw.snooze_minutes)
+      const next = {
+        vibration: nextRaw.vibration !== false,
+        sound: nextRaw.sound !== false,
+        snooze_minutes: Number.isFinite(snooze_minutes) && snooze_minutes > 0 ? Math.min(180, Math.floor(snooze_minutes)) : 10
+      }
+      saveReminderSettings(next)
+      return next
+    })
+  }
 
   const patchItem = (clientId, patch) => {
     setItems((prev) =>
@@ -205,12 +247,25 @@ export default function ReminderQueueModal({ visible, onClose, userId, onSaved }
             </div>
             <div className="text-xs opacity-60 dark:text-gray-400 mt-1">保存后会按 time 升序自动整理</div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-none"
-          >
-            <i className="fa-solid fa-times text-lg"></i>
-          </button>
+          <div className="flex items-center gap-2 flex-none">
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`w-9 h-9 flex items-center justify-center rounded-full border transition-colors ${
+                activeTab === 'settings'
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-gray-50 dark:bg-gray-700/40 border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+              title="提醒设置"
+            >
+              <i className="fa-solid fa-gear"></i>
+            </button>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            >
+              <i className="fa-solid fa-times text-lg"></i>
+            </button>
+          </div>
         </div>
 
         <div className="px-5 md:px-6 pt-4 flex items-center justify-between gap-3">
@@ -234,6 +289,16 @@ export default function ReminderQueueModal({ visible, onClose, userId, onSaved }
               }`}
             >
               JSON 编辑
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`px-3 py-2 rounded-xl text-sm border transition-colors ${
+                activeTab === 'settings'
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-gray-50 dark:bg-gray-700/40 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              提醒设置
             </button>
           </div>
           <div className="flex items-center gap-2">
@@ -265,6 +330,113 @@ export default function ReminderQueueModal({ visible, onClose, userId, onSaved }
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : activeTab === 'settings' ? (
+            <div className="space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 md:p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-gray-800 dark:text-white">提醒设置（本地）</div>
+                    <div className="text-xs opacity-70 dark:text-gray-400 mt-1">仅保存在当前设备的 localStorage</div>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center flex-none">
+                    <i className="fa-solid fa-sliders"></i>
+                  </div>
+                </div>
+
+                <div className="mt-5 space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-gray-800 dark:text-white">震动提醒</div>
+                      <div className="text-xs opacity-70 dark:text-gray-400 mt-1">通知到达时触发震动</div>
+                    </div>
+                    <button
+                      onClick={() => patchSettings({ vibration: !reminderSettings.vibration })}
+                      className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
+                        reminderSettings.vibration ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                      aria-label="震动提醒"
+                      type="button"
+                    >
+                      <span
+                        className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                          reminderSettings.vibration ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-gray-800 dark:text-white">响铃提醒</div>
+                      <div className="text-xs opacity-70 dark:text-gray-400 mt-1">通知到达时播放系统通知声音</div>
+                    </div>
+                    <button
+                      onClick={() => patchSettings({ sound: !reminderSettings.sound })}
+                      className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
+                        reminderSettings.sound ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                      aria-label="响铃提醒"
+                      type="button"
+                    >
+                      <span
+                        className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                          reminderSettings.sound ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    <div className="md:col-span-7">
+                      <div className="text-sm font-bold text-gray-800 dark:text-white">延后时间（分钟）</div>
+                      <div className="text-xs opacity-70 dark:text-gray-400 mt-1">点击“延后”后再次提醒的间隔</div>
+                    </div>
+                    <div className="md:col-span-5">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => patchSettings({ snooze_minutes: Math.max(1, (reminderSettings.snooze_minutes || 10) - 1) })}
+                          className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center"
+                          aria-label="减少 1 分钟"
+                        >
+                          <i className="fa-solid fa-minus"></i>
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          max={180}
+                          value={reminderSettings.snooze_minutes}
+                          onChange={(e) => patchSettings({ snooze_minutes: e.target.value === '' ? 10 : Number(e.target.value) })}
+                          className="flex-1 px-4 py-2.5 rounded-xl bg-white dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all dark:text-white dark:[color-scheme:dark]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => patchSettings({ snooze_minutes: Math.min(180, (reminderSettings.snooze_minutes || 10) + 1) })}
+                          className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center"
+                          aria-label="增加 1 分钟"
+                        >
+                          <i className="fa-solid fa-plus"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = { ...DEFAULT_REMINDER_SETTINGS }
+                        setReminderSettings(next)
+                        saveReminderSettings(next)
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+                    >
+                      恢复默认
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : activeTab === 'json' ? (
             <div className="space-y-3">

@@ -10,6 +10,9 @@ import ReminderQueueModal from './components/ReminderQueueModal.jsx'
 import * as api from './services/api.js'
 import taskEventBus from './utils/eventBus.js'
 
+const REMINDER_SETTINGS_KEY = 'taskStreamReminderSettings'
+const DEFAULT_REMINDER_SETTINGS = { vibration: true, sound: true, snooze_minutes: 10 }
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
@@ -22,6 +25,7 @@ function App() {
   const reminderNotifListenerRef = useRef(null)
   const lastReminderUserIdRef = useRef(null)
   const localNotificationsRef = useRef(null)
+  const reminderChannelIdRef = useRef(null)
 
   const isNativePlatform = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -31,15 +35,6 @@ function App() {
     return !!cap.isNativePlatform
   }, [])
 
-  const shouldBlockWebAccess = useMemo(() => {
-    if (!import.meta.env.PROD) return false
-    if (isNativePlatform) return false
-    if (typeof window === 'undefined') return false
-    const host = window.location?.hostname
-    if (!host) return false
-    return host !== 'localhost' && host !== '127.0.0.1'
-  }, [isNativePlatform])
-
   const getLocalNotifications = async () => {
     if (!isNativePlatform) return null
     if (localNotificationsRef.current) return localNotificationsRef.current
@@ -47,6 +42,29 @@ function App() {
     const ln = cap?.Plugins?.LocalNotifications || null
     localNotificationsRef.current = ln
     return ln
+  }
+
+  const loadReminderSettings = () => {
+    if (typeof window === 'undefined') return { ...DEFAULT_REMINDER_SETTINGS }
+    try {
+      const raw = localStorage.getItem(REMINDER_SETTINGS_KEY)
+      const parsed = raw ? JSON.parse(raw) : null
+      const snooze_minutes = Number(parsed?.snooze_minutes)
+      return {
+        vibration: parsed?.vibration !== false,
+        sound: parsed?.sound !== false,
+        snooze_minutes:
+          Number.isFinite(snooze_minutes) && snooze_minutes > 0 ? Math.min(180, Math.floor(snooze_minutes)) : 10
+      }
+    } catch {
+      return { ...DEFAULT_REMINDER_SETTINGS }
+    }
+  }
+
+  const reminderChannelIdFor = (settings) => {
+    const v = settings?.vibration !== false ? 1 : 0
+    const s = settings?.sound !== false ? 1 : 0
+    return `reminders_v${v}_s${s}`
   }
 
   // Loading Screen States
@@ -112,6 +130,24 @@ function App() {
 
   useEffect(() => {
     if (!isNativePlatform) return
+    const onWake = () => {
+      if (!isLoggedIn) return
+      if (!userId) return
+      if (typeof document !== 'undefined' && document.visibilityState && document.visibilityState !== 'visible') return
+      syncReminderNotifications(userId).catch(() => {})
+    }
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('focus', onWake)
+    const interval = setInterval(onWake, 5 * 60 * 1000)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('focus', onWake)
+    }
+  }, [isLoggedIn, userId, isNativePlatform])
+
+  useEffect(() => {
+    if (!isNativePlatform) return
     if (isLoggedIn) return
     const lastUid = lastReminderUserIdRef.current
     if (!lastUid) return
@@ -146,6 +182,8 @@ function App() {
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [showReminderQueueModal, setShowReminderQueueModal] = useState(false)
+  const [pendingReminderAction, setPendingReminderAction] = useState(null)
+  const [pendingSnoozeMinutes, setPendingSnoozeMinutes] = useState(10)
 
   const parseReminderAt = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return null
@@ -177,7 +215,6 @@ function App() {
 
   const ensureReminderNotificationsReady = async () => {
     if (!isNativePlatform) return false
-    if (reminderNotifInitRef.current) return true
 
     const LocalNotifications = await getLocalNotifications()
     if (!LocalNotifications) return false
@@ -189,13 +226,20 @@ function App() {
     }
 
     try {
-      await LocalNotifications.createChannel({
-        id: 'reminders',
-        name: 'Reminders',
-        importance: 5,
-        visibility: 1,
-        vibration: true
-      })
+      const settings = loadReminderSettings()
+      const channelId = reminderChannelIdFor(settings)
+      if (!reminderNotifInitRef.current || reminderChannelIdRef.current !== channelId) {
+        const channel = {
+          id: channelId,
+          name: 'Task Stream Reminders',
+          importance: settings.sound || settings.vibration ? 5 : 3,
+          visibility: 1,
+          vibration: !!settings.vibration
+        }
+        if (!settings.sound) channel.sound = null
+        await LocalNotifications.createChannel(channel)
+        reminderChannelIdRef.current = channelId
+      }
     } catch {
     }
 
@@ -206,8 +250,12 @@ function App() {
             id: 'TASKSTREAM_REMINDER_ACTIONS',
             actions: [
               {
-                id: 'SNOOZE_10',
-                title: '延后10分钟'
+                id: 'ACK',
+                title: '知道了'
+              },
+              {
+                id: 'SNOOZE',
+                title: '延后'
               }
             ]
           }
@@ -220,30 +268,53 @@ function App() {
       reminderNotifListenerRef.current = await LocalNotifications.addListener(
         'localNotificationActionPerformed',
         async (event) => {
-          if (event?.actionId !== 'SNOOZE_10') return
           const reminder = event?.notification?.extra?.reminder
           if (!reminder) return
-          const snoozeAt = new Date(Date.now() + 10 * 60 * 1000)
-          const id = Math.floor(Date.now() % 2147483647)
-          await LocalNotifications.schedule({
-            notifications: [
-              {
-                id,
-                title: 'Task Stream 提醒（已延后）',
-                body: reminder?.content || '提醒',
-                schedule: { at: snoozeAt, allowWhileIdle: true },
-                channelId: 'reminders',
-                actionTypeId: 'TASKSTREAM_REMINDER_ACTIONS',
-                extra: {
-                  source: 'taskstream_reminder',
-                  snoozed: true,
-                  reminder
+
+          if (event?.actionId === 'SNOOZE') {
+            const settings = loadReminderSettings()
+            const minutes = Number(settings?.snooze_minutes) || 10
+            const snoozeAt = new Date(Date.now() + minutes * 60 * 1000)
+            const id = Math.floor(Date.now() % 2147483647) || 1
+            const channelId = reminderChannelIdFor(settings)
+            await LocalNotifications.schedule({
+              notifications: [
+                {
+                  id,
+                  title: 'Task Stream 提醒（已延后）',
+                  body: reminder?.content || '提醒',
+                  schedule: { at: snoozeAt, allowWhileIdle: true },
+                  channelId,
+                  actionTypeId: 'TASKSTREAM_REMINDER_ACTIONS',
+                  extra: {
+                    source: 'taskstream_reminder',
+                    snoozed: true,
+                    reminder
+                  }
                 }
-              }
-            ]
-          })
+              ]
+            })
+            return
+          }
+
+          if (event?.actionId === 'ACK') return
+
+          if (event?.actionId === 'tap' || !event?.actionId) {
+            const settings = loadReminderSettings()
+            setPendingReminderAction({ reminder, notification: event?.notification || null })
+            setPendingSnoozeMinutes(Number(settings?.snooze_minutes) || 10)
+            return
+          }
         }
       )
+    }
+
+    try {
+      const exact = await LocalNotifications.checkExactNotificationSetting?.()
+      if (exact && exact.value && exact.value !== 'granted') {
+        await LocalNotifications.changeExactNotificationSetting?.()
+      }
+    } catch {
     }
 
     reminderNotifInitRef.current = true
@@ -257,6 +328,8 @@ function App() {
     if (!ready) return
     const LocalNotifications = await getLocalNotifications()
     if (!LocalNotifications) return
+    const settings = loadReminderSettings()
+    const channelId = reminderChannelIdFor(settings)
 
     const storageKey = `taskStream:scheduledReminderIds:${uid}`
     let oldIds = []
@@ -292,7 +365,7 @@ function App() {
         title: 'Task Stream 提醒',
         body: r?.content || '提醒',
         schedule: { at, allowWhileIdle: true },
-        channelId: 'reminders',
+        channelId,
         actionTypeId: 'TASKSTREAM_REMINDER_ACTIONS',
         extra: {
           source: 'taskstream_reminder',
@@ -313,6 +386,36 @@ function App() {
       const chunk = notifications.slice(i, i + chunkSize)
       await LocalNotifications.schedule({ notifications: chunk })
     }
+  }
+
+  const scheduleReminderSnooze = async (reminder, minutesRaw) => {
+    if (!isNativePlatform) return
+    const LocalNotifications = await getLocalNotifications()
+    if (!LocalNotifications) return
+    const ready = await ensureReminderNotificationsReady()
+    if (!ready) return
+    const settings = loadReminderSettings()
+    const minutes = Math.min(180, Math.max(1, Math.floor(Number(minutesRaw) || settings.snooze_minutes || 10)))
+    const snoozeAt = new Date(Date.now() + minutes * 60 * 1000)
+    const id = Math.floor(Date.now() % 2147483647) || 1
+    const channelId = reminderChannelIdFor(settings)
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id,
+          title: 'Task Stream 提醒（已延后）',
+          body: reminder?.content || '提醒',
+          schedule: { at: snoozeAt, allowWhileIdle: true },
+          channelId,
+          actionTypeId: 'TASKSTREAM_REMINDER_ACTIONS',
+          extra: {
+            source: 'taskstream_reminder',
+            snoozed: true,
+            reminder
+          }
+        }
+      ]
+    })
   }
 
   const [settings, setSettings] = useState({
@@ -867,22 +970,6 @@ function App() {
     setDetailFilter('all') // Reset status filter to show all tasks for that day
   }
 
-  if (shouldBlockWebAccess) {
-    return (
-      <div style={cssVariables} className={`h-screen flex items-center justify-center bg-page text-txt ${isDarkMode ? 'dark' : ''}`}>
-        <div className="bg-card border border-gray-100 dark:border-gray-700 rounded-2xl p-6 md:p-8 max-w-lg w-full mx-4 shadow-2xl">
-          <div className="flex items-center gap-3">
-            <i className="fa-solid fa-mobile-screen-button text-primary text-2xl"></i>
-            <div className="text-xl font-bold dark:text-white">请使用 Task Stream 安卓 App</div>
-          </div>
-          <div className="mt-3 text-sm opacity-70 dark:text-gray-400">
-            该地址不提供网页版访问。
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div style={cssVariables} className={`h-screen flex flex-col ${isDarkMode ? 'dark' : ''}`}>
       {isLoading && (
@@ -1022,6 +1109,70 @@ function App() {
         task={editingTask} 
         currentUserId={user?.id}
       />
+      {pendingReminderAction && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-3 md:p-4 overflow-y-auto">
+          <div className="bg-card w-full max-w-lg rounded-2xl shadow-2xl transform transition-all flex flex-col max-h-[92vh] border border-gray-100 dark:border-gray-700">
+            <div className="flex items-start justify-between gap-4 p-5 border-b border-gray-100 dark:border-gray-700">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <i className="fa-solid fa-bell text-yellow-500"></i>
+                  <div className="text-lg font-bold text-gray-800 dark:text-white truncate">提醒</div>
+                </div>
+                <div className="text-xs opacity-60 dark:text-gray-400 mt-1">从通知进入，可在此延后</div>
+              </div>
+              <button
+                onClick={() => setPendingReminderAction(null)}
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-none"
+              >
+                <i className="fa-solid fa-times text-lg"></i>
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto custom-scrollbar flex-1 min-h-0 space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-2xl p-4">
+                <div className="text-sm text-gray-800 dark:text-white whitespace-pre-wrap break-words">
+                  {pendingReminderAction?.reminder?.content || '提醒'}
+                </div>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-2xl p-4">
+                <div className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2">延后分钟</div>
+                <input
+                  type="number"
+                  min={1}
+                  max={180}
+                  value={pendingSnoozeMinutes}
+                  onChange={(e) => setPendingSnoozeMinutes(Math.min(180, Math.max(1, Number(e.target.value) || 1)))}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all dark:text-white dark:[color-scheme:dark]"
+                />
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-gray-100 dark:border-gray-700 flex gap-3">
+              <button
+                onClick={() => setPendingReminderAction(null)}
+                className="flex-1 px-6 py-3 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                知道了
+              </button>
+              <button
+                onClick={async () => {
+                  const reminder = pendingReminderAction?.reminder
+                  setPendingReminderAction(null)
+                  if (!reminder) return
+                  try {
+                    await scheduleReminderSnooze(reminder, pendingSnoozeMinutes)
+                  } catch {
+                  }
+                }}
+                className="flex-1 px-6 py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:brightness-110 transition-all"
+              >
+                延后
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ReminderQueueModal
         visible={showReminderQueueModal}
         onClose={() => setShowReminderQueueModal(false)}
