@@ -6,17 +6,7 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from app.services import ai_config_service
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv
-
-root_dir = Path(__file__).resolve().parents[3]
-env_dev_path = root_dir / ".env.development"
-env_prod_path = root_dir / ".env.production"
-if env_dev_path.exists():
-    load_dotenv(env_dev_path)
-elif env_prod_path.exists():
-    load_dotenv(env_prod_path)
-else:
-    load_dotenv()
+from app.core.config import OPENAI_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL
 
 def init_agent_executor(user_id: int, db: Session, tools):
     """
@@ -33,11 +23,11 @@ def init_agent_executor(user_id: int, db: Session, tools):
     config = ai_config_service.get_ai_config(db, user_id)
     
     # 获取API密钥，优先使用用户配置，其次使用环境变量
-    api_key = config.api_key if (config and config.api_key) else os.getenv("OPENAI_API_KEY")
-    # 获取API基础URL，默认使用阿里云DashScope兼容模式
-    base_url = config.openai_base_url if (config and config.openai_base_url) else os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-    # 获取模型名称，优先使用用户配置，其次使用环境变量，最后默认qwen-max
-    model_name = config.model if (config and config.model) else os.getenv("OPENAI_MODEL", "qwen-max")
+    api_key = config.api_key if (config and config.api_key) else OPENAI_API_KEY
+    # 获取API基础URL，优先使用用户配置，其次使用环境变量
+    base_url = config.openai_base_url if (config and config.openai_base_url) else (OPENAI_BASE_URL or "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    # 获取模型名称，优先使用用户配置，其次使用环境变量，最后使用默认配置
+    model_name = config.model if (config and config.model) else OPENAI_MODEL
     
     print(f"DEBUG: initializing agent. Model: {model_name}, BaseURL: {base_url}")
     print(f"DEBUG: API Key loaded: {'Yes' if api_key else 'No'} ({api_key[:5]}... if present)")

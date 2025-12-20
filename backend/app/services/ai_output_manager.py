@@ -17,13 +17,13 @@ class ActionManager:
         self.pending_events: Dict[str, asyncio.Event] = {}
         self.results: Dict[str, bool] = {}
 
-    async def wait_for_action(self, action_id: str, timeout: int = 600) -> bool:
+    async def wait_for_action(self, action_id: str, timeout: int = 30) -> bool:
         """
         等待指定动作的结果
         
         参数:
             action_id: 动作ID
-            timeout: 超时时间，默认为600秒
+            timeout: 超时时间，默认为30秒
         
         返回:
             bool: 动作结果，True表示确认，False表示取消或超时
@@ -170,7 +170,7 @@ class OutputManager:
 
         # 使用全局管理器挂起，等待用户确认
         print(f"DEBUG: Waiting for action {action_id}...")
-        result = await global_action_manager.wait_for_action(action_id)
+        result = await global_action_manager.wait_for_action(action_id, timeout=30)
         print(f"DEBUG: Action {action_id} finished with result {result}")
         
         card_data["user_confirmation"] = "Y" if result else "N"

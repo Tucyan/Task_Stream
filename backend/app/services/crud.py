@@ -96,6 +96,33 @@ def create_long_term_task(task: schemas.LongTermTaskCreate, db: Session) -> sche
     db.add(db_lt)
     db.commit()
     db.refresh(db_lt)
+    
+    if task.sub_task_ids:
+        old_long_term_task_ids = set()
+        for raw_task_id in task.sub_task_ids.keys():
+            try:
+                task_id = int(raw_task_id)
+            except (TypeError, ValueError):
+                continue
+            
+            db_task = db.query(models.Task).filter(
+                models.Task.id == task_id,
+                models.Task.user_id == task.user_id
+            ).first()
+            if not db_task:
+                continue
+            
+            if db_task.long_term_task_id and db_task.long_term_task_id != db_lt.id:
+                old_long_term_task_ids.add(db_task.long_term_task_id)
+            
+            db_task.long_term_task_id = db_lt.id
+        
+        db.commit()
+        update_long_term_task_progress(db_lt.id, db)
+        for old_id in old_long_term_task_ids:
+            update_long_term_task_progress(old_id, db)
+        db.refresh(db_lt)
+    
     return map_long_term_task_to_schema(db, db_lt)
 
 def delete_long_term_task(task_id: int, db: Session) -> bool:

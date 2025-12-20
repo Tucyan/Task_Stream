@@ -36,27 +36,250 @@ export default function AiAssistantView() {
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const touchStartRef = useRef(null); // For swipe detection
+    const userIdRef = useRef(1);
+    const messagesRef = useRef([]);
+    const currentDialogueIdRef = useRef(null);
+    const activeStreamDialogueIdRef = useRef(null);
+    const abortControllerRef = useRef(null);
+    const cacheWriteTimeoutRef = useRef(null);
+
+    const getLastDialogueKey = (uid) => `taskStreamAi:lastDialogueId:${uid}`;
+    const getPendingActionsKey = (uid) => `taskStreamAi:pendingActions:${uid}`;
+    const getMessagesCacheKey = (uid, did) => `taskStreamAi:cachedMessages:${uid}:${did}`;
+
+    const safeJsonParse = (value, fallback) => {
+        if (!value) return fallback;
+        try {
+            return JSON.parse(value);
+        } catch {
+            return fallback;
+        }
+    };
+
+    const readPendingActions = (uid) => {
+        const raw = localStorage.getItem(getPendingActionsKey(uid));
+        const parsed = safeJsonParse(raw, {});
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    };
+
+    const writePendingActions = (uid, pending) => {
+        localStorage.setItem(getPendingActionsKey(uid), JSON.stringify(pending || {}));
+    };
+
+    const flushMessagesCache = (uid, did, messageList) => {
+        if (!uid || !did) return;
+        try {
+            sessionStorage.setItem(getMessagesCacheKey(uid, did), JSON.stringify(messageList || []));
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const extractPendingActionIdsFromMessages = (messageList) => {
+        const ids = [];
+        for (const msg of Array.isArray(messageList) ? messageList : []) {
+            const content = typeof msg?.content === 'string' ? [{ type: 'text', text: msg.content }] : msg?.content;
+            if (!Array.isArray(content)) continue;
+            for (const item of content) {
+                if (item?.type !== 'card') continue;
+                const actionId = item?.data?.action_id;
+                const confirmation = item?.data?.user_confirmation;
+                if (!actionId) continue;
+                if (confirmation === 'Y' || confirmation === 'N') continue;
+                ids.push(actionId);
+            }
+        }
+        return Array.from(new Set(ids));
+    };
+
+    const updateCardConfirmationInMessages = (messageList, actionId, confirmation) => {
+        let changed = false;
+        const next = (Array.isArray(messageList) ? messageList : []).map(msg => {
+            const content = typeof msg?.content === 'string' ? [{ type: 'text', text: msg.content }] : msg?.content;
+            if (!Array.isArray(content)) return msg;
+            let contentChanged = false;
+            const nextContent = content.map(item => {
+                if (item?.type !== 'card') return item;
+                const card = item?.data;
+                if (!card || card.action_id !== actionId) return item;
+                contentChanged = true;
+                changed = true;
+                return { ...item, data: { ...card, user_confirmation: confirmation } };
+            });
+            if (!contentChanged) return msg;
+            return { ...msg, content: nextContent };
+        });
+        return { changed, messages: next };
+    };
+
+    const reconcilePendingActionsForDialogue = async (uid, did, messageList) => {
+        const pending = readPendingActions(uid);
+        const now = Date.now();
+        const relevantActionIds = extractPendingActionIdsFromMessages(messageList);
+
+        const nextPending = { ...pending };
+        for (const actionId of Object.keys(nextPending)) {
+            const entry = nextPending[actionId];
+            if (!entry || typeof entry !== 'object') continue;
+            if (entry.dialogueId !== did) continue;
+            if (!relevantActionIds.includes(actionId)) {
+                delete nextPending[actionId];
+            }
+        }
+
+        let nextMessages = messageList;
+        for (const actionId of relevantActionIds) {
+            const entry = nextPending[actionId] || { dialogueId: did, leftAt: null };
+            const leftAt = entry.leftAt;
+
+            if (typeof leftAt === 'number' && now - leftAt >= 30000) {
+                const result = updateCardConfirmationInMessages(nextMessages, actionId, 'N');
+                nextMessages = result.messages;
+                delete nextPending[actionId];
+                api.cancelAiAction(actionId, uid).catch((e) => {
+                    const msg = String(e?.message || '');
+                    if (!msg.includes('Action not found') && !msg.includes('timeout')) {
+                        console.error(e);
+                    }
+                });
+            } else {
+                nextPending[actionId] = { ...entry, dialogueId: did, leftAt: null };
+            }
+        }
+
+        writePendingActions(uid, nextPending);
+        return nextMessages;
+    };
+
+    const extractActionConfirmationsFromMessages = (messageList) => {
+        const map = {};
+        for (const msg of Array.isArray(messageList) ? messageList : []) {
+            const content = typeof msg?.content === 'string' ? [{ type: 'text', text: msg.content }] : msg?.content;
+            if (!Array.isArray(content)) continue;
+            for (const item of content) {
+                if (item?.type !== 'card') continue;
+                const actionId = item?.data?.action_id;
+                const confirmation = item?.data?.user_confirmation;
+                if (!actionId) continue;
+                if (confirmation === 'Y' || confirmation === 'N') {
+                    map[actionId] = confirmation;
+                }
+            }
+        }
+        return map;
+    };
+
+    const applyActionConfirmationsToMessages = (messageList, confirmations) => {
+        let next = messageList;
+        for (const [actionId, confirmation] of Object.entries(confirmations || {})) {
+            const result = updateCardConfirmationInMessages(next, actionId, confirmation);
+            next = result.messages;
+        }
+        return next;
+    };
+
+    const markLeaveTimeForPendingActions = (uid, did, messageList) => {
+        const pending = readPendingActions(uid);
+        const now = Date.now();
+        const ids = extractPendingActionIdsFromMessages(messageList);
+        if (ids.length === 0) return;
+
+        const nextPending = { ...pending };
+        for (const actionId of ids) {
+            const entry = nextPending[actionId];
+            nextPending[actionId] = {
+                ...(entry && typeof entry === 'object' ? entry : {}),
+                dialogueId: did,
+                leftAt: now
+            };
+        }
+        writePendingActions(uid, nextPending);
+    };
+
+    const setLastDialogueId = (uid, did) => {
+        const key = getLastDialogueKey(uid);
+        if (!did) {
+            localStorage.removeItem(key);
+            return;
+        }
+        localStorage.setItem(key, String(did));
+    };
 
     // Initialize
     useEffect(() => {
-        const savedUser = localStorage.getItem('taskStreamUser');
-        let uid = 1;
-        if (savedUser) {
-            try {
-                const u = JSON.parse(savedUser);
-                uid = u.id;
-            } catch (e) { console.error(e); }
-        }
-        setUserId(uid);
-        
-        loadConfig(uid);
-        loadDialogues(uid);
+        let isActive = true;
+        const run = async () => {
+            const savedUser = localStorage.getItem('taskStreamUser');
+            let uid = 1;
+            if (savedUser) {
+                try {
+                    const u = JSON.parse(savedUser);
+                    uid = u.id;
+                } catch (e) { console.error(e); }
+            }
+            userIdRef.current = uid;
+            if (!isActive) return;
+            setUserId(uid);
+            await loadConfig(uid);
+            const sorted = await loadDialogues(uid);
+            if (!isActive) return;
+
+            const lastRaw = localStorage.getItem(getLastDialogueKey(uid));
+            const lastDid = lastRaw ? Number(lastRaw) : null;
+            const exists = lastDid && Array.isArray(sorted) && sorted.some(d => d.id === lastDid);
+            const didToSelect = exists ? lastDid : (sorted?.[0]?.id ?? null);
+
+            if (didToSelect) {
+                await selectDialogue(didToSelect, uid);
+            } else {
+                setLastDialogueId(uid, null);
+            }
+        };
+
+        run();
+
+        return () => {
+            isActive = false;
+            const uid = userIdRef.current;
+            const did = activeStreamDialogueIdRef.current ?? currentDialogueIdRef.current;
+            if (uid && did) {
+                if (cacheWriteTimeoutRef.current) clearTimeout(cacheWriteTimeoutRef.current);
+                flushMessagesCache(uid, did, messagesRef.current);
+                markLeaveTimeForPendingActions(uid, did, messagesRef.current);
+            }
+            abortControllerRef.current?.abort();
+        };
     }, []);
 
     // Scroll to bottom on new messages
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    useEffect(() => {
+        userIdRef.current = userId;
+    }, [userId]);
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
+
+    useEffect(() => {
+        currentDialogueIdRef.current = currentDialogueId;
+    }, [currentDialogueId]);
+
+    useEffect(() => {
+        const uid = userId;
+        const did = currentDialogueId;
+        if (!uid || !did) return;
+        if (cacheWriteTimeoutRef.current) clearTimeout(cacheWriteTimeoutRef.current);
+        cacheWriteTimeoutRef.current = setTimeout(() => {
+            flushMessagesCache(uid, did, messagesRef.current);
+        }, 250);
+        return () => {
+            if (cacheWriteTimeoutRef.current) clearTimeout(cacheWriteTimeoutRef.current);
+        };
+    }, [userId, currentDialogueId, messages]);
 
     const loadConfig = async (uid) => {
         try {
@@ -78,8 +301,10 @@ export default function AiAssistantView() {
             // Sort by id desc (newest first)
             const sorted = res.sort((a, b) => b.id - a.id);
             setDialogues(sorted);
+            return sorted;
         } catch (e) {
             console.error("Failed to load dialogues", e);
+            return [];
         }
     };
 
@@ -97,15 +322,30 @@ export default function AiAssistantView() {
         }
     };
 
-    const selectDialogue = async (did) => {
+    const selectDialogue = async (did, uidOverride) => {
+        const uid = uidOverride ?? userIdRef.current ?? userId;
         if (currentDialogueId === did) return;
         setCurrentDialogueId(did);
         setMessages([]); // Clear current view
-        
+        setLastDialogueId(uid, did);
+
         if (!did) return; // "New Chat" selected
 
+        let cachedReconciled = null;
         try {
-            const res = await api.getDialogue(did, userId);
+            const cachedRaw = sessionStorage.getItem(getMessagesCacheKey(uid, did));
+            const cached = safeJsonParse(cachedRaw, null);
+            if (Array.isArray(cached) && cached.length > 0) {
+                const reconciled = await reconcilePendingActionsForDialogue(uid, did, cached);
+                cachedReconciled = reconciled;
+                setMessages(reconciled);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+
+        try {
+            const res = await api.getDialogue(did, uid);
             // Parse messages
             // Backend returns: { messages: [ [userMsg, aiMsg], ... ] } or similar structure?
             // ai_test.html says: data.messages.forEach(turn => { if(isArray(turn)) turn.forEach(...) })
@@ -140,9 +380,42 @@ export default function AiAssistantView() {
                     }
                 });
             }
-            setMessages(parsedMessages);
+            const backendReconciled = await reconcilePendingActionsForDialogue(uid, did, parsedMessages);
+
+            if (Array.isArray(cachedReconciled) && cachedReconciled.length > 0) {
+                if (backendReconciled.length >= cachedReconciled.length) {
+                    setMessages(backendReconciled);
+                    flushMessagesCache(uid, did, backendReconciled);
+                } else {
+                    const confirmations = extractActionConfirmationsFromMessages(backendReconciled);
+                    const merged = applyActionConfirmationsToMessages(cachedReconciled, confirmations);
+                    setMessages(merged);
+                    flushMessagesCache(uid, did, merged);
+                }
+            } else {
+                setMessages(backendReconciled);
+                flushMessagesCache(uid, did, backendReconciled);
+            }
         } catch (e) {
             console.error("Failed to load dialogue history", e);
+        }
+    };
+
+    const onCardConfirmationChange = (actionId, confirmation) => {
+        const uid = userIdRef.current;
+        const did = currentDialogueIdRef.current;
+        setMessages(prev => {
+            const result = updateCardConfirmationInMessages(prev, actionId, confirmation);
+            if (result.changed) {
+                flushMessagesCache(uid, did, result.messages);
+            }
+            return result.messages;
+        });
+        const pending = readPendingActions(uid);
+        if (pending[actionId]) {
+            const nextPending = { ...pending };
+            delete nextPending[actionId];
+            writePendingActions(uid, nextPending);
         }
     };
 
@@ -161,6 +434,7 @@ export default function AiAssistantView() {
                 const res = await api.createDialogue(userId, newTitle);
                 targetDialogueId = res.id;
                 setCurrentDialogueId(targetDialogueId);
+                setLastDialogueId(userId, targetDialogueId);
                 // Refresh list
                 await loadDialogues(userId);
             } catch (e) {
@@ -175,12 +449,15 @@ export default function AiAssistantView() {
 
         // Start streaming
         setIsStreaming(true);
+        activeStreamDialogueIdRef.current = targetDialogueId;
         const assistantMsg = { role: 'assistant', content: [] }; // Content will be array of segments
         setMessages(prev => [...prev, assistantMsg]);
 
         try {
             const { url, options } = api.getChatStreamOptions(targetDialogueId, userId, text);
-            const response = await fetch(`${api.API_BASE_URL || 'http://localhost:8000'}${url}`, options);
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+            const response = await fetch(`${api.API_BASE_URL || 'http://localhost:8000'}${url}`, { ...options, signal: controller.signal });
             
             if (!response.ok) throw new Error(response.statusText);
             
@@ -214,10 +491,13 @@ export default function AiAssistantView() {
                 }
             }
         } catch (e) {
-            console.error(e);
-            setMessages(prev => [...prev, { role: 'system', content: "Error: " + e.message }]);
+            if (e?.name !== 'AbortError') {
+                console.error(e);
+                setMessages(prev => [...prev, { role: 'system', content: "Error: " + e.message }]);
+            }
         } finally {
             setIsStreaming(false);
+            abortControllerRef.current = null;
         }
     };
 
@@ -264,6 +544,19 @@ export default function AiAssistantView() {
                     
                     if (!isDuplicate) {
                         lastMsg.content.push({ type: 'card', data: card });
+
+                        const actionId = card?.action_id;
+                        const confirmation = card?.user_confirmation;
+                        if (actionId && confirmation !== 'Y' && confirmation !== 'N') {
+                            const uid = userIdRef.current;
+                            const did = activeStreamDialogueIdRef.current ?? currentDialogueIdRef.current;
+                            if (uid && did) {
+                                const pending = readPendingActions(uid);
+                                if (!pending[actionId]) {
+                                    writePendingActions(uid, { ...pending, [actionId]: { dialogueId: did, leftAt: null } });
+                                }
+                            }
+                        }
                         
                         // Check for auto-confirmed actions (or actions confirmed by backend immediately)
                         if (card.user_confirmation === 'Y') {
@@ -422,7 +715,7 @@ export default function AiAssistantView() {
                     )}
                     
                     {messages.map((msg, idx) => (
-                        <MessageItem key={idx} role={msg.role} content={msg.content} userId={userId} />
+                        <MessageItem key={idx} role={msg.role} content={msg.content} userId={userId} onCardConfirmationChange={onCardConfirmationChange} />
                     ))}
                     <div ref={messagesEndRef} />
                 </div>
@@ -638,7 +931,7 @@ const markdownComponents = {
     ),
 };
 
-function MessageItem({ role, content, userId }) {
+function MessageItem({ role, content, userId, onCardConfirmationChange }) {
     // If content is just a string (old format or simple message)
     if (typeof content === 'string') {
         content = [{ type: 'text', text: content }];
@@ -671,7 +964,7 @@ function MessageItem({ role, content, userId }) {
                                     </div>
                                 </div>
                             }
-                            {item.type === 'card' && <CardItem card={item.data} userId={userId} />}
+                            {item.type === 'card' && <CardItem card={item.data} userId={userId} onCardConfirmationChange={onCardConfirmationChange} />}
                         </div>
                     ))}
                 </div>
@@ -680,7 +973,7 @@ function MessageItem({ role, content, userId }) {
     );
 }
 
-function CardItem({ card, userId }) {
+function CardItem({ card, userId, onCardConfirmationChange }) {
     const { type, data, action_id, user_confirmation } = card;
     const [actionStatus, setActionStatus] = useState(() => {
         if (user_confirmation === 'Y') return 'confirmed';
@@ -689,6 +982,12 @@ function CardItem({ card, userId }) {
     }); // 'confirming', 'cancelling', 'confirmed', 'cancelled', 'failed'
     const [subTaskDetails, setSubTaskDetails] = useState({});
     const [longTermTaskDetails, setLongTermTaskDetails] = useState({});
+
+    useEffect(() => {
+        if (user_confirmation === 'Y') setActionStatus('confirmed');
+        else if (user_confirmation === 'N') setActionStatus('cancelled');
+        else if (actionStatus === 'confirmed' || actionStatus === 'cancelled') setActionStatus(null);
+    }, [user_confirmation, actionStatus]);
 
     // Fetch details for referenced tasks (Subtasks and Long Term Tasks)
     useEffect(() => {
@@ -769,6 +1068,7 @@ function CardItem({ card, userId }) {
             if (act === 'confirm') {
                 await api.confirmAiAction(action_id, userId);
                 setActionStatus('confirmed');
+                onCardConfirmationChange?.(action_id, 'Y');
                 
                 // Update other views via EventBus
                 // Type 1: Create Task, 2: Delete Task, 3: Update Task, 4: Create Long Term
@@ -781,9 +1081,17 @@ function CardItem({ card, userId }) {
             } else {
                 await api.cancelAiAction(action_id, userId);
                 setActionStatus('cancelled');
+                onCardConfirmationChange?.(action_id, 'N');
             }
         } catch (e) {
-            alert("操作失败: " + e.message);
+            const msg = String(e?.message || '');
+            const isNotFoundOrTimeout = msg.includes('Action not found') || msg.includes('timeout') || msg.includes('Not Found');
+            if (isNotFoundOrTimeout) {
+                setActionStatus('cancelled');
+                onCardConfirmationChange?.(action_id, 'N');
+                return;
+            }
+            alert("操作失败: " + msg);
             setActionStatus('failed');
         }
     };

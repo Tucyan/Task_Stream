@@ -3,17 +3,13 @@ import json
 import uuid
 import os
 from sqlalchemy.orm import Session
+from app.core.config import AI_CONTEXT_WINDOW_TURNS
 from app.services import ai_agent, ai_tools, ai_output_manager, ai_config_service
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 from app.core.database import SessionLocal
 
 def _get_context_window_turns() -> int:
-    raw = os.getenv("AI_CONTEXT_WINDOW_TURNS", "5")
-    try:
-        value = int(raw)
-    except Exception:
-        value = 5
-    return max(value, 0)
+    return max(AI_CONTEXT_WINDOW_TURNS, 0)
 
 def map_card_to_tool(card_type, card_data):
     """根据卡片类型和数据，推断工具名称和参数"""

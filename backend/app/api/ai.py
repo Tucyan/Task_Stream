@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
+from app.core.config import OPENAI_MODEL
 from app.schemas import schemas
 from app.services import ai_config_service, ai_service, ai_output_manager
 from sse_starlette.sse import EventSourceResponse
@@ -24,7 +25,7 @@ def get_ai_config(user_id: int, db: Session = Depends(get_db)):
         default_config = schemas.AIConfigCreate(
             user_id=user_id,
             api_key="",
-            model="qwen-flash"
+            model=OPENAI_MODEL
         )
         config = ai_config_service.create_ai_config(db, default_config)
     return config

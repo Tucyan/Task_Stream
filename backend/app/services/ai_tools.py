@@ -48,6 +48,8 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         title: str = Field(..., description="任务标题(必填项)")
         description: Optional[str] = Field(None, description="任务描述")
         due_date: Optional[str] = Field(None, description="截止日期 YYYY-MM-DD HH:MM(用户未提及你不需要填写)")
+        assigned_date: Optional[str] = Field(None, description="分配日期 YYYY-MM-DD")
+        
         assigned_start_time: Optional[str] = Field(None, description="开始时间 HH:MM")
         assigned_end_time: Optional[str] = Field(None, description="结束时间 HH:MM")
         tags: Optional[List[str]] = Field(None, description="标签列表")
@@ -57,19 +59,21 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         long_term_task_id: Optional[int] = Field(None, description="关联的长期任务ID")
 
     async def create_task(title: str, description: str = None, due_date: str = None, 
+                         assigned_date: str = None,
                          assigned_start_time: str = None, assigned_end_time: str = None,
                          tags: List[str] = None, record_result: bool = False,
                          result: str = "", result_picture_url: List[str] = None,
                          long_term_task_id: int = None):
         """创建新任务"""
         print(f"DEBUG: Tool create_task called. Title: {title}")
+        effective_assigned_date = assigned_date or datetime.datetime.now().strftime("%Y-%m-%d")
         card_data = {
             "type": 1,
             "data": {
                 "title": title,
                 "description": description,
                 "due_date": due_date,
-                "assigned_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+                "assigned_date": effective_assigned_date,
                 "assigned_start_time": assigned_start_time,
                 "assigned_end_time": assigned_end_time,
                 "tags": tags if tags is not None else [],
@@ -93,7 +97,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
                     description=description,
                     status=1,
                     due_date=due_date,
-                    assigned_date=datetime.datetime.now().strftime("%Y-%m-%d"),
+                    assigned_date=effective_assigned_date,
                     assigned_start_time=assigned_start_time,
                     assigned_end_time=assigned_end_time,
                     tags=tags if tags is not None else [],
@@ -143,6 +147,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         description: Optional[str] = Field(None, description="新描述")
         status: Optional[int] = Field(None, description="新状态 (1:待办, 3:完成)")
         due_date: Optional[str] = Field(None, description="新截止日期 YYYY-MM-DD HH:MM")
+        assigned_date: Optional[str] = Field(None, description="新分配日期 YYYY-MM-DD")
         assigned_start_time: Optional[str] = Field(None, description="新开始时间 HH:MM")
         assigned_end_time: Optional[str] = Field(None, description="新结束时间 HH:MM")
         tags: Optional[List[str]] = Field(None, description="新标签列表")
@@ -152,7 +157,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         long_term_task_id: Optional[int] = Field(None, description="关联的长期任务ID")
 
     async def update_task(task_id: int, title: str = None, description: str = None, status: int = None, 
-                         due_date: str = None, assigned_start_time: str = None, assigned_end_time: str = None,
+                         due_date: str = None, assigned_date: str = None, assigned_start_time: str = None, assigned_end_time: str = None,
                          tags: List[str] = None, record_result: bool = None, result: str = None,
                          result_picture_url: List[str] = None, long_term_task_id: int = None):
         """更新任务信息"""
@@ -166,6 +171,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         if description is not None: updated_data['description'] = description
         if status is not None: updated_data['status'] = status
         if due_date is not None: updated_data['due_date'] = due_date
+        if assigned_date is not None: updated_data['assigned_date'] = assigned_date
         if assigned_start_time is not None: updated_data['assigned_start_time'] = assigned_start_time
         if assigned_end_time is not None: updated_data['assigned_end_time'] = assigned_end_time
         if tags is not None: updated_data['tags'] = tags
@@ -224,11 +230,10 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         description: Optional[str] = Field(None, description="描述")
         start_date: Optional[str] = Field(None, description="开始日期 YYYY-MM-DD")
         due_date: Optional[str] = Field(None, description="截止日期 YYYY-MM-DD")
-        progress: Optional[float] = Field(0.0, description="进度 (0.0-1.0)")
         sub_task_ids: Optional[dict] = Field(None, description="子任务ID及权重, 例如 {'1': 0.5, '2': 0.5}")
 
     async def create_long_term_task(title: str, description: str = None, start_date: str = None, 
-                                  due_date: str = None, progress: float = 0.0, sub_task_ids: dict = None):
+                                  due_date: str = None, sub_task_ids: dict = None):
         """创建长期任务"""
         card_data = {
             "type": 4, # Long term task creation
@@ -237,7 +242,6 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
                 "description": description,
                 "start_date": start_date,
                 "due_date": due_date,
-                "progress": progress,
                 "sub_task_ids": sub_task_ids
             }
         }
@@ -252,7 +256,6 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
                     description=description,
                     start_date=start_date,
                     due_date=due_date,
-                    progress=progress,
                     sub_task_ids=sub_task_ids
                 )
                 new_lt = crud.create_long_term_task(lt_task, db)
@@ -294,12 +297,11 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         description: Optional[str] = Field(None, description="新描述")
         start_date: Optional[str] = Field(None, description="新开始日期 YYYY-MM-DD")
         due_date: Optional[str] = Field(None, description="新截止日期 YYYY-MM-DD")
-        progress: Optional[float] = Field(None, description="新进度 (0.0-1.0)")
         sub_task_ids: Optional[dict] = Field(None, description="新子任务ID及权重, 例如 {'1': 0.5}")
 
     async def update_long_term_task(task_id: int, title: str = None, description: str = None, 
                                   start_date: str = None, due_date: str = None, 
-                                  progress: float = None, sub_task_ids: dict = None):
+                                   sub_task_ids: dict = None):
         """更新长期任务"""
         lt = crud.get_long_term_task_by_id(task_id, db)
         if not lt:
@@ -310,7 +312,6 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         if description is not None: updated_data['description'] = description
         if start_date is not None: updated_data['start_date'] = start_date
         if due_date is not None: updated_data['due_date'] = due_date
-        if progress is not None: updated_data['progress'] = progress
         if sub_task_ids is not None: updated_data['sub_task_ids'] = sub_task_ids
         
         try:
