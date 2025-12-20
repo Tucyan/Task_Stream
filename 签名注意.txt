@@ -24,4 +24,3 @@
 - $env:ANDROID_KEY_ALIAS='...'
 - $env:ANDROID_KEY_PASSWORD='...' 然后再跑： npm run android:release:apk
 补充：我已经把 storeFile 的相对路径解析修正为相对 android/ 目录，所以 storeFile=keystore/release.keystore 这种写法现在是正确可用的。
-
