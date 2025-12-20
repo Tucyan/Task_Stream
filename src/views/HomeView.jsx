@@ -257,7 +257,7 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
   return (
     <div
       key={task.id}
-      className={`rounded-2xl p-4 flex flex-col items-center justify-between border-2 shadow-sm transition-all text-white flex-1 ${cardClass}`}
+      className={`rounded-2xl p-4 flex flex-col items-center justify-between border-2 shadow-sm transition-all text-white flex-1 max-h-32 max-w-xs ${cardClass}`}
     >
       <div className="mb-2 font-bold text-2xl tracking-wider drop-shadow-md">
         {getRemainTime(task.due_date)}

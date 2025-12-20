@@ -17,6 +17,7 @@
     "@bytemd/plugin-gfm": "^1.22.0",
     "@bytemd/react": "^1.22.0",
     "@capacitor/core": "^6.1.2",
+    "@capacitor/local-notifications": "^6.0.0",
     "bytemd": "^1.22.0",
     "js-sha256": "^0.11.1",
     "react": "^19.2.0",

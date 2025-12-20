@@ -57,6 +57,12 @@ def update_ai_config(db: Session, user_id: int, update_data: schemas.AIConfigUpd
     
     update_dict = update_data.dict(exclude_unset=True)
     for key, value in update_dict.items():
+        if key == "ai_dialogue_id_list":
+            setattr(db_config, key, json.dumps(value or []))
+            continue
+        if key == "reminder_list":
+            setattr(db_config, key, json.dumps(value or []))
+            continue
         setattr(db_config, key, value)
         
     db.commit()

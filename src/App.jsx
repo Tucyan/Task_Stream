@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import AuthModal from './components/AuthModal.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import MobileNav from './components/MobileNav.jsx'
@@ -6,6 +6,9 @@ import HeaderBar from './components/HeaderBar.jsx'
 import MainContent from './components/MainContent.jsx'
 import ResultModal from './components/ResultModal.jsx'
 import TaskModal from './components/TaskModal.jsx'
+import ReminderQueueModal from './components/ReminderQueueModal.jsx'
+import { Capacitor } from '@capacitor/core'
+import { LocalNotifications } from '@capacitor/local-notifications'
 import * as api from './services/api.js'
 import taskEventBus from './utils/eventBus.js'
 
@@ -57,6 +60,7 @@ function App() {
           
           // 异步更新最新设置（后台静默更新）
           await loadSettings(userInfo.id)
+          syncReminderNotifications(userInfo.id).catch(() => {})
         } catch (e) {
           console.error('Failed to parse saved user info:', e)
           localStorage.removeItem('taskStreamUser')
@@ -70,6 +74,35 @@ function App() {
     initApp()
   }, [])
 
+  useEffect(() => {
+    if (!isLoggedIn) return
+    if (!userId) return
+    if (!isNativePlatform) return
+    lastReminderUserIdRef.current = userId
+    syncReminderNotifications(userId).catch(() => {})
+  }, [isLoggedIn, userId, isNativePlatform])
+
+  useEffect(() => {
+    if (!isNativePlatform) return
+    if (isLoggedIn) return
+    const lastUid = lastReminderUserIdRef.current
+    if (!lastUid) return
+    lastReminderUserIdRef.current = null
+    const storageKey = `taskStream:scheduledReminderIds:${lastUid}`
+    try {
+      const raw = localStorage.getItem(storageKey)
+      const ids = raw ? JSON.parse(raw) : []
+      if (Array.isArray(ids) && ids.length > 0) {
+        LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) }).catch(() => {})
+      }
+    } catch {
+    }
+    try {
+      localStorage.removeItem(storageKey)
+    } catch {
+    }
+  }, [isLoggedIn, isNativePlatform])
+
   // 处理用户信息更新
   const handleUserUpdate = (updatedUser) => {
     console.log('[App] 用户信息已更新:', updatedUser)
@@ -79,6 +112,181 @@ function App() {
   // Task Modal State
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
+  const [showReminderQueueModal, setShowReminderQueueModal] = useState(false)
+  const reminderNotifInitRef = useRef(false)
+  const reminderNotifListenerRef = useRef(null)
+  const lastReminderUserIdRef = useRef(null)
+
+  const isNativePlatform = useMemo(() => {
+    try {
+      return Capacitor.isNativePlatform()
+    } catch {
+      return false
+    }
+  }, [])
+
+  const parseReminderAt = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return null
+    const m = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/)
+    if (!m) return null
+    const year = Number(m[1])
+    const month = Number(m[2]) - 1
+    const day = Number(m[3])
+    const hour = Number(m[4])
+    const minute = Number(m[5])
+    const d = new Date(year, month, day, hour, minute, 0, 0)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+
+  const reminderStableId = (reminder) => {
+    const raw = JSON.stringify({
+      type: reminder?.type ?? '',
+      time: reminder?.time ?? '',
+      content: reminder?.content ?? '',
+      task_id: reminder?.task_id ?? null
+    })
+    let hash = 0
+    for (let i = 0; i < raw.length; i += 1) {
+      hash = (hash * 31 + raw.charCodeAt(i)) | 0
+    }
+    const n = Math.abs(hash)
+    return (n % 2147483647) || 1
+  }
+
+  const ensureReminderNotificationsReady = async () => {
+    if (!isNativePlatform) return false
+    if (reminderNotifInitRef.current) return true
+
+    const perm = await LocalNotifications.checkPermissions()
+    if (perm?.display !== 'granted') {
+      const asked = await LocalNotifications.requestPermissions()
+      if (asked?.display !== 'granted') return false
+    }
+
+    try {
+      await LocalNotifications.createChannel({
+        id: 'reminders',
+        name: 'Reminders',
+        importance: 5,
+        visibility: 1,
+        vibration: true
+      })
+    } catch {
+    }
+
+    try {
+      await LocalNotifications.registerActionTypes({
+        types: [
+          {
+            id: 'TASKSTREAM_REMINDER_ACTIONS',
+            actions: [
+              {
+                id: 'SNOOZE_10',
+                title: '延后10分钟'
+              }
+            ]
+          }
+        ]
+      })
+    } catch {
+    }
+
+    if (!reminderNotifListenerRef.current) {
+      reminderNotifListenerRef.current = await LocalNotifications.addListener(
+        'localNotificationActionPerformed',
+        async (event) => {
+          if (event?.actionId !== 'SNOOZE_10') return
+          const reminder = event?.notification?.extra?.reminder
+          if (!reminder) return
+          const snoozeAt = new Date(Date.now() + 10 * 60 * 1000)
+          const id = Math.floor(Date.now() % 2147483647)
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                id,
+                title: 'Task Stream 提醒（已延后）',
+                body: reminder?.content || '提醒',
+                schedule: { at: snoozeAt, allowWhileIdle: true },
+                channelId: 'reminders',
+                actionTypeId: 'TASKSTREAM_REMINDER_ACTIONS',
+                extra: {
+                  source: 'taskstream_reminder',
+                  snoozed: true,
+                  reminder
+                }
+              }
+            ]
+          })
+        }
+      )
+    }
+
+    reminderNotifInitRef.current = true
+    return true
+  }
+
+  const syncReminderNotifications = async (uidOverride) => {
+    const uid = uidOverride ?? userId
+    if (!uid || !isNativePlatform) return
+    const ready = await ensureReminderNotificationsReady()
+    if (!ready) return
+
+    const storageKey = `taskStream:scheduledReminderIds:${uid}`
+    let oldIds = []
+    try {
+      const raw = localStorage.getItem(storageKey)
+      oldIds = raw ? JSON.parse(raw) : []
+    } catch {
+      oldIds = []
+    }
+    if (Array.isArray(oldIds) && oldIds.length > 0) {
+      try {
+        await LocalNotifications.cancel({
+          notifications: oldIds.map((id) => ({ id }))
+        })
+      } catch {
+      }
+    }
+
+    const list = await api.getReminderList(uid)
+    const now = Date.now()
+    const upcoming = (Array.isArray(list) ? list : [])
+      .map((r) => ({ r, at: parseReminderAt(r?.time) }))
+      .filter((x) => x.at && x.at.getTime() >= now - 5000)
+      .sort((a, b) => a.at.getTime() - b.at.getTime())
+
+    const maxToSchedule = 120
+    const notifications = upcoming.slice(0, maxToSchedule).map(({ r, at }) => {
+      const baseId = reminderStableId(r)
+      const atMs = at.getTime()
+      const id = (baseId + (atMs % 1000000)) % 2147483647
+      return {
+        id: id || baseId,
+        title: 'Task Stream 提醒',
+        body: r?.content || '提醒',
+        schedule: { at, allowWhileIdle: true },
+        channelId: 'reminders',
+        actionTypeId: 'TASKSTREAM_REMINDER_ACTIONS',
+        extra: {
+          source: 'taskstream_reminder',
+          userId: uid,
+          reminder: r
+        }
+      }
+    })
+
+    const newIds = notifications.map((n) => n.id)
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(newIds))
+    } catch {
+    }
+
+    const chunkSize = 50
+    for (let i = 0; i < notifications.length; i += chunkSize) {
+      const chunk = notifications.slice(i, i + chunkSize)
+      await LocalNotifications.schedule({ notifications: chunk })
+    }
+  }
 
   const [settings, setSettings] = useState({
     primary: '#6366f1',
@@ -663,6 +871,7 @@ function App() {
             
             // 等待设置加载完成后再显示主界面
             await loadSettings(userInfo.id)
+            syncReminderNotifications(userInfo.id).catch(() => {})
             setCurrentView('home')
 
             // 渐隐Loading
@@ -696,6 +905,7 @@ function App() {
                   }} 
                   user={user} 
                   onUserUpdate={handleUserUpdate}
+                  onOpenReminderEditor={() => setShowReminderQueueModal(true)}
                 />
                 <MainContent
                   currentView={currentView}
@@ -732,6 +942,7 @@ function App() {
                     resetLocalTheme()
                   }}
                   onUserUpdate={handleUserUpdate}
+                  onOpenReminderEditor={() => setShowReminderQueueModal(true)}
                   // New props for CRUD
                   onAddTask={handleAddTask}
                   onEditTask={handleEditTask}
@@ -767,6 +978,12 @@ function App() {
         onSave={handleSaveTask} 
         task={editingTask} 
         currentUserId={user?.id}
+      />
+      <ReminderQueueModal
+        visible={showReminderQueueModal}
+        onClose={() => setShowReminderQueueModal(false)}
+        userId={userId}
+        onSaved={() => syncReminderNotifications(userId).catch(() => {})}
       />
     </div>
   )

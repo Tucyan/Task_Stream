@@ -1,6 +1,6 @@
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from app.services import crud, ai_config_service
 from app.services.ai_output_manager import OutputManager
@@ -40,6 +40,12 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         elif action_type == 'delete':
             return bool(config.is_auto_confirm_delete_request)
         return False
+    
+    def check_auto_confirm_reminder() -> bool:
+        config = ai_config_service.get_ai_config(db, user_id)
+        if not config:
+            return False
+        return bool(config.is_auto_confirm_create_reminder)
 
     # --- Tools Definitions ---
 
@@ -465,8 +471,51 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         if memo:
             return f"备忘录内容: {memo.content}"
         return "备忘录为空"
+    
+    class AddReminderInput(BaseModel):
+        type: str = Field(..., description="提醒类型: Message/Task/LongTermTask")
+        time: str = Field(..., description="提醒时间 YYYY-MM-DD HH:MM")
+        content: str = Field(..., description="提醒内容")
+        task_id: Optional[int] = Field(None, description="任务ID(type为Task/LongTermTask时必填)")
 
-    return [
+    async def add_reminder(type: str, time: str, content: str, task_id: int = None):
+        reminder = {"type": type, "time": time, "content": content}
+        if task_id is not None:
+            reminder["task_id"] = task_id
+
+        card_data = {"type": 8, "data": reminder}
+        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm_reminder())
+        if not confirmed:
+            return "用户取消了提醒创建"
+        try:
+            new_list = crud.add_reminder(user_id, reminder, db)
+            return f"提醒已添加，共 {len(new_list)} 条"
+        except Exception as e:
+            return f"添加提醒失败: {str(e)}"
+
+    class GetReminderListInput(BaseModel):
+        pass
+
+    async def get_reminder_list():
+        import json
+        reminders = crud.get_reminder_list(user_id, db)
+        return json.dumps(reminders, ensure_ascii=False)
+
+    class UpdateReminderListInput(BaseModel):
+        reminder_list: List[Dict[str, Any]] = Field(..., description="完整提醒列表(会自动校验并按time升序)")
+
+    async def update_reminder_list(reminder_list: List[Dict[str, Any]]):
+        card_data = {"type": 9, "data": {"reminder_list": reminder_list}}
+        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm('update'))
+        if not confirmed:
+            return "用户取消了提醒列表更新"
+        try:
+            new_list = crud.update_reminder_list(user_id, reminder_list, db)
+            return f"提醒列表已更新，共 {len(new_list)} 条"
+        except Exception as e:
+            return f"更新提醒列表失败: {str(e)}"
+
+    tools: List[StructuredTool] = [
         StructuredTool.from_function(coroutine=create_task, name="create_task", description="创建新任务", args_schema=CreateTaskInput),
         StructuredTool.from_function(coroutine=delete_task, name="delete_task", description="删除任务", args_schema=DeleteTaskInput),
         StructuredTool.from_function(coroutine=update_task, name="update_task", description="更新任务信息", args_schema=UpdateTaskInput),
@@ -484,4 +533,8 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         
         StructuredTool.from_function(coroutine=get_memo, name="get_memo", description="获取备忘录内容", args_schema=GetMemoInput),
         
+        StructuredTool.from_function(coroutine=add_reminder, name="add_reminder", description="新增一条提醒", args_schema=AddReminderInput),
+        StructuredTool.from_function(coroutine=get_reminder_list, name="get_reminder_list", description="获取提醒列表(按time升序)", args_schema=GetReminderListInput),
+        StructuredTool.from_function(coroutine=update_reminder_list, name="update_reminder_list", description="更新提醒列表(强校验+自动排序)", args_schema=UpdateReminderListInput),
     ]
+    return tools

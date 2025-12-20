@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import * as api from '../services/api.js'
 
-export default function SettingsView({ isDarkMode, toggleDarkMode, settings, setSettings, presetColors, resetTheme, saveSettings, user, onLogout, onUserUpdate }) {
+export default function SettingsView({ isDarkMode, toggleDarkMode, settings, setSettings, presetColors, resetTheme, saveSettings, user, onLogout, onUserUpdate, onOpenReminderEditor }) {
   const [nickname, setNickname] = useState(user?.nickname || '')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -75,9 +75,19 @@ export default function SettingsView({ isDarkMode, toggleDarkMode, settings, set
   return (
     <div className="max-w-4xl mx-auto h-full min-h-0 flex flex-col">
       <div className="bg-card md:rounded-3xl rounded-none shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
-        <div className="p-6 md:p-8 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-2xl font-bold mb-2 dark:text-white">个性化设置</h2>
-          <p className="text-sm opacity-60 dark:text-gray-400">定制属于你的 Task Stream 视觉体验</p>
+        <div className="p-6 md:p-8 border-b border-gray-100 dark:border-gray-700 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold mb-2 dark:text-white">个性化设置</h2>
+            <p className="text-sm opacity-60 dark:text-gray-400">定制属于你的 Task Stream 视觉体验</p>
+          </div>
+          <button
+            onClick={onOpenReminderEditor}
+            className="md:hidden w-10 h-10 rounded-xl flex items-center justify-center hover:bg-yellow-500/10 dark:hover:bg-yellow-500/10 transition-colors border border-transparent hover:border-yellow-500/20"
+            title="编辑提醒队列"
+            type="button"
+          >
+            <i className="fa-solid fa-bell text-yellow-500"></i>
+          </button>
         </div>
         <div className="md:p-8 p-0 space-y-6 md:space-y-10 flex-1 min-h-0 overflow-y-auto pr-2">
           {/* 移动端专用的用户设置区域 */}

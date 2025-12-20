@@ -241,6 +241,16 @@ export async function updateAiConfig(userId, config) {
     });
 }
 
+export async function getReminderList(userId) {
+    const res = await getAiConfig(userId);
+    return Array.isArray(res?.reminder_list) ? res.reminder_list : [];
+}
+
+export async function updateReminderList(userId, reminderList) {
+    const res = await updateAiConfig(userId, { reminder_list: reminderList });
+    return Array.isArray(res?.reminder_list) ? res.reminder_list : [];
+}
+
 /**
  * 获取用户对话列表
  * @param {number} userId 

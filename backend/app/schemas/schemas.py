@@ -146,6 +146,7 @@ class AIConfigUpdate(BaseModel):
     is_auto_confirm_update_request: Optional[int] = None
     is_auto_confirm_delete_request: Optional[int] = None
     is_auto_confirm_create_reminder: Optional[int] = None
+    reminder_list: Optional[List[Dict[str, Any]]] = None
 
 class AIConfig(AIConfigBase):
     id: int

@@ -663,3 +663,96 @@ def update_settings(user_id: int, settings: schemas.SettingsUpdate, db: Session)
     db.commit()
     db.refresh(db_settings)
     return db_settings
+
+def get_reminder_list(user_id: int, db: Session) -> List[dict]:
+    config = db.query(models.AIConfig).filter(models.AIConfig.user_id == user_id).first()
+    if not config or not config.reminder_list:
+        return []
+    try:
+        parsed = json.loads(config.reminder_list)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    normalized_items: List[dict] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        try:
+            normalized_items.append(_normalize_reminder_item(item))
+        except ValueError:
+            continue
+    normalized_items.sort(key=lambda x: _parse_reminder_time(x["time"]))
+    return normalized_items
+
+def update_reminder_list(user_id: int, reminder_list: Optional[List[dict]], db: Session) -> List[dict]:
+    config = db.query(models.AIConfig).filter(models.AIConfig.user_id == user_id).first()
+    normalized_items: List[dict] = []
+    for item in (reminder_list or []):
+        if not isinstance(item, dict):
+            raise ValueError("reminder_list item must be an object")
+        normalized_items.append(_normalize_reminder_item(item))
+    normalized_items.sort(key=lambda x: _parse_reminder_time(x["time"]))
+    serialized = json.dumps(normalized_items, ensure_ascii=False)
+    if not config:
+        config = models.AIConfig(
+            user_id=user_id,
+            api_key="",
+            model="qwen-plus",
+            openai_base_url="",
+            prompt=None,
+            character=None,
+            long_term_memory=None,
+            ai_dialogue_id_list=json.dumps([]),
+            is_enable_prompt=0,
+            is_auto_confirm_create_request=0,
+            is_auto_confirm_update_request=0,
+            is_auto_confirm_delete_request=0,
+            is_auto_confirm_create_reminder=0,
+            reminder_list=serialized
+        )
+        db.add(config)
+    else:
+        config.reminder_list = serialized
+    db.commit()
+    db.refresh(config)
+    return get_reminder_list(user_id, db)
+
+def add_reminder(user_id: int, reminder: dict, db: Session) -> List[dict]:
+    if not isinstance(reminder, dict):
+        raise ValueError("reminder must be an object")
+    existing = get_reminder_list(user_id, db)
+    existing.append(_normalize_reminder_item(reminder))
+    existing.sort(key=lambda x: _parse_reminder_time(x["time"]))
+    return update_reminder_list(user_id, existing, db)
+
+def _parse_reminder_time(value: str) -> datetime:
+    return datetime.strptime(value, "%Y-%m-%d %H:%M")
+
+def _normalize_reminder_item(item: dict) -> dict:
+    reminder_type = item.get("type")
+    if reminder_type not in {"Message", "Task", "LongTermTask"}:
+        raise ValueError("invalid reminder type")
+
+    time_value = item.get("time")
+    if not isinstance(time_value, str) or not time_value.strip():
+        raise ValueError("invalid reminder time")
+    _parse_reminder_time(time_value)
+
+    content_value = item.get("content")
+    if not isinstance(content_value, str) or not content_value.strip():
+        raise ValueError("invalid reminder content")
+
+    normalized = {
+        "type": reminder_type,
+        "time": time_value,
+        "content": content_value
+    }
+
+    if reminder_type in {"Task", "LongTermTask"}:
+        task_id = item.get("task_id")
+        if not isinstance(task_id, int):
+            raise ValueError("task_id must be an integer for Task/LongTermTask")
+        normalized["task_id"] = task_id
+
+    return normalized

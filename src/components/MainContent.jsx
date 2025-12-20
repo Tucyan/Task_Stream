@@ -77,7 +77,8 @@ export default function MainContent({
   onTaskUpdate,
   user,
   onLogout,
-  onUserUpdate
+  onUserUpdate,
+  onOpenReminderEditor
 }) {
   return (
     <div className="flex-1 min-h-0 flex flex-col relative bg-page transition-colors duration-300">
@@ -133,6 +134,7 @@ export default function MainContent({
             user={user}
             onLogout={onLogout}
             onUserUpdate={onUserUpdate}
+            onOpenReminderEditor={onOpenReminderEditor}
           />
         )}
       </div>

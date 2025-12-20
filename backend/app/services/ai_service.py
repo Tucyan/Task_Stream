@@ -64,6 +64,19 @@ def map_card_to_tool(card_type, card_data):
             "date": after.get("date"),
             "content": after.get("content")
         }
+    elif card_type == 8:
+        tool_name = "add_reminder"
+        tool_args = {
+            "type": card_data.get("type"),
+            "time": card_data.get("time"),
+            "content": card_data.get("content"),
+            "task_id": card_data.get("task_id")
+        }
+    elif card_type == 9:
+        tool_name = "update_reminder_list"
+        tool_args = {
+            "reminder_list": card_data.get("reminder_list")
+        }
         
     # 清理 None 值参数，让上下文更干净
     tool_args = {k: v for k, v in tool_args.items() if v is not None}
@@ -117,7 +130,7 @@ async def run_chat_stream(user_id: int, dialogue_id: int, content: str):
                                         # 文本消息
                                         text = item_data.get('content', '')
                                         if text: current_text_parts.append(text)
-                                    elif item_type in [1, 2, 3, 4, 7]:
+                                    elif item_type in [1, 2, 3, 4, 7, 8, 9]:
                                         # 卡片 -> 视为一次成功的工具调用
                                         tool_name, tool_args = map_card_to_tool(item_type, item_data)
                                         call_id = f"call_{uuid.uuid4().hex[:8]}"
