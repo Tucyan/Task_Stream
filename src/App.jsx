@@ -43,9 +43,10 @@ function App() {
   const getLocalNotifications = async () => {
     if (!isNativePlatform) return null
     if (localNotificationsRef.current) return localNotificationsRef.current
-    const mod = await import('@capacitor/local-notifications')
-    localNotificationsRef.current = mod.LocalNotifications
-    return localNotificationsRef.current
+    const cap = typeof window !== 'undefined' ? window.Capacitor : null
+    const ln = cap?.Plugins?.LocalNotifications || null
+    localNotificationsRef.current = ln
+    return ln
   }
 
   // Loading Screen States
@@ -116,19 +117,19 @@ function App() {
     if (!lastUid) return
     lastReminderUserIdRef.current = null
     const storageKey = `taskStream:scheduledReminderIds:${lastUid}`
-    try {
-      const raw = localStorage.getItem(storageKey)
-      const ids = raw ? JSON.parse(raw) : []
-      if (Array.isArray(ids) && ids.length > 0) {
-        getLocalNotifications()
-          .then((LocalNotifications) => {
-            if (!LocalNotifications) return
-            return LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) })
-          })
-          .catch(() => {})
+    ;(async () => {
+      try {
+        const raw = localStorage.getItem(storageKey)
+        const ids = raw ? JSON.parse(raw) : []
+        if (Array.isArray(ids) && ids.length > 0) {
+          const LocalNotifications = await getLocalNotifications()
+          if (LocalNotifications) {
+            LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) }).catch(() => {})
+          }
+        }
+      } catch {
       }
-    } catch {
-    }
+    })()
     try {
       localStorage.removeItem(storageKey)
     } catch {
