@@ -7,8 +7,6 @@ import MainContent from './components/MainContent.jsx'
 import ResultModal from './components/ResultModal.jsx'
 import TaskModal from './components/TaskModal.jsx'
 import ReminderQueueModal from './components/ReminderQueueModal.jsx'
-import { Capacitor } from '@capacitor/core'
-import { LocalNotifications } from '@capacitor/local-notifications'
 import * as api from './services/api.js'
 import taskEventBus from './utils/eventBus.js'
 
@@ -20,6 +18,35 @@ function App() {
   const [showResultModal, setShowResultModal] = useState(false)
   const [userId, setUserId] = useState(1) // Mock user ID
   const [user, setUser] = useState(null) // 存储用户信息
+  const reminderNotifInitRef = useRef(false)
+  const reminderNotifListenerRef = useRef(null)
+  const lastReminderUserIdRef = useRef(null)
+  const localNotificationsRef = useRef(null)
+
+  const isNativePlatform = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    const cap = window.Capacitor
+    if (!cap) return false
+    if (typeof cap.isNativePlatform === 'function') return cap.isNativePlatform()
+    return !!cap.isNativePlatform
+  }, [])
+
+  const shouldBlockWebAccess = useMemo(() => {
+    if (!import.meta.env.PROD) return false
+    if (isNativePlatform) return false
+    if (typeof window === 'undefined') return false
+    const host = window.location?.hostname
+    if (!host) return false
+    return host !== 'localhost' && host !== '127.0.0.1'
+  }, [isNativePlatform])
+
+  const getLocalNotifications = async () => {
+    if (!isNativePlatform) return null
+    if (localNotificationsRef.current) return localNotificationsRef.current
+    const mod = await import('@capacitor/local-notifications')
+    localNotificationsRef.current = mod.LocalNotifications
+    return localNotificationsRef.current
+  }
 
   // Loading Screen States
   const [isLoading, setIsLoading] = useState(true)
@@ -93,7 +120,12 @@ function App() {
       const raw = localStorage.getItem(storageKey)
       const ids = raw ? JSON.parse(raw) : []
       if (Array.isArray(ids) && ids.length > 0) {
-        LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) }).catch(() => {})
+        getLocalNotifications()
+          .then((LocalNotifications) => {
+            if (!LocalNotifications) return
+            return LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) })
+          })
+          .catch(() => {})
       }
     } catch {
     }
@@ -113,17 +145,6 @@ function App() {
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [showReminderQueueModal, setShowReminderQueueModal] = useState(false)
-  const reminderNotifInitRef = useRef(false)
-  const reminderNotifListenerRef = useRef(null)
-  const lastReminderUserIdRef = useRef(null)
-
-  const isNativePlatform = useMemo(() => {
-    try {
-      return Capacitor.isNativePlatform()
-    } catch {
-      return false
-    }
-  }, [])
 
   const parseReminderAt = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return null
@@ -156,6 +177,9 @@ function App() {
   const ensureReminderNotificationsReady = async () => {
     if (!isNativePlatform) return false
     if (reminderNotifInitRef.current) return true
+
+    const LocalNotifications = await getLocalNotifications()
+    if (!LocalNotifications) return false
 
     const perm = await LocalNotifications.checkPermissions()
     if (perm?.display !== 'granted') {
@@ -230,6 +254,8 @@ function App() {
     if (!uid || !isNativePlatform) return
     const ready = await ensureReminderNotificationsReady()
     if (!ready) return
+    const LocalNotifications = await getLocalNotifications()
+    if (!LocalNotifications) return
 
     const storageKey = `taskStream:scheduledReminderIds:${uid}`
     let oldIds = []
@@ -838,6 +864,22 @@ function App() {
     setFilterDateStart(dateStr)
     setFilterDateEnd(dateStr)
     setDetailFilter('all') // Reset status filter to show all tasks for that day
+  }
+
+  if (shouldBlockWebAccess) {
+    return (
+      <div style={cssVariables} className={`h-screen flex items-center justify-center bg-page text-txt ${isDarkMode ? 'dark' : ''}`}>
+        <div className="bg-card border border-gray-100 dark:border-gray-700 rounded-2xl p-6 md:p-8 max-w-lg w-full mx-4 shadow-2xl">
+          <div className="flex items-center gap-3">
+            <i className="fa-solid fa-mobile-screen-button text-primary text-2xl"></i>
+            <div className="text-xl font-bold dark:text-white">请使用 Task Stream 安卓 App</div>
+          </div>
+          <div className="mt-3 text-sm opacity-70 dark:text-gray-400">
+            该地址不提供网页版访问。
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

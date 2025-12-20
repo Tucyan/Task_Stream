@@ -63,3 +63,4 @@ build
 *.tsbuildinfo
 .gradle/
 签名注意.txt
+.android-sdk
