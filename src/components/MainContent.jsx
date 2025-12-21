@@ -85,6 +85,7 @@ export default function MainContent({
       <div className={`flex-1 min-h-0 ${currentView === 'settings' || currentView === 'ai' || currentView === 'journal' ? 'p-0' : 'p-4 pt-8'} md:p-8 md:pt-2`}>
         {currentView === 'home' && (
           <HomeView 
+            key={userId || 'home'}
             todayTasks={todayTasks} 
             onToggleTask={onToggleTask} 
             deadlines={deadlines} 
@@ -92,6 +93,7 @@ export default function MainContent({
             onAddTask={onAddTask}
             onDeleteTask={onDeleteTask}
             userId={userId}
+            user={user}
           />
         )}
         {currentView === 'detail' && (

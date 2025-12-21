@@ -83,7 +83,7 @@ export default function SettingsView({ isDarkMode, toggleDarkMode, settings, set
           <button
             onClick={onOpenReminderEditor}
             className="md:hidden w-10 h-10 rounded-xl flex items-center justify-center hover:bg-yellow-500/10 dark:hover:bg-yellow-500/10 transition-colors border border-transparent hover:border-yellow-500/20"
-            title="编辑提醒队列"
+            title="提醒设置"
             type="button"
           >
             <i className="fa-solid fa-bell text-yellow-500"></i>

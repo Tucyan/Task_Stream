@@ -26,6 +26,7 @@ function App() {
   const lastReminderUserIdRef = useRef(null)
   const localNotificationsRef = useRef(null)
   const reminderChannelIdRef = useRef(null)
+  const reminderAllowWhileIdleRef = useRef(true)
 
   const isNativePlatform = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -213,11 +214,18 @@ function App() {
     return (n % 2147483647) || 1
   }
 
+  const reminderScheduleFor = (at) => {
+    if (!(at instanceof Date)) return { at }
+    return reminderAllowWhileIdleRef.current ? { at, allowWhileIdle: true } : { at }
+  }
+
   const ensureReminderNotificationsReady = async () => {
     if (!isNativePlatform) return false
 
     const LocalNotifications = await getLocalNotifications()
     if (!LocalNotifications) return false
+    const cap = typeof window !== 'undefined' ? window.Capacitor : null
+    const nativePlatform = typeof cap?.getPlatform === 'function' ? cap.getPlatform() : null
 
     const perm = await LocalNotifications.checkPermissions()
     if (perm?.display !== 'granted') {
@@ -229,15 +237,22 @@ function App() {
       const settings = loadReminderSettings()
       const channelId = reminderChannelIdFor(settings)
       if (!reminderNotifInitRef.current || reminderChannelIdRef.current !== channelId) {
-        const channel = {
-          id: channelId,
-          name: 'Task Stream Reminders',
-          importance: settings.sound || settings.vibration ? 5 : 3,
-          visibility: 1,
-          vibration: !!settings.vibration
+        if (nativePlatform === 'android') {
+          const existing = await LocalNotifications.listChannels().catch(() => null)
+          const channels = Array.isArray(existing?.channels) ? existing.channels : Array.isArray(existing) ? existing : []
+          const found = channels.some((c) => c?.id === channelId)
+          if (!found) {
+            const channel = {
+              id: channelId,
+              name: 'Task Stream Reminders',
+              importance: settings.sound || settings.vibration ? 5 : 3,
+              visibility: 1,
+              vibration: !!settings.vibration
+            }
+            if (!settings.sound) channel.sound = null
+            await LocalNotifications.createChannel(channel)
+          }
         }
-        if (!settings.sound) channel.sound = null
-        await LocalNotifications.createChannel(channel)
         reminderChannelIdRef.current = channelId
       }
     } catch {
@@ -283,7 +298,7 @@ function App() {
                   id,
                   title: 'Task Stream 提醒（已延后）',
                   body: reminder?.content || '提醒',
-                  schedule: { at: snoozeAt, allowWhileIdle: true },
+                  schedule: reminderScheduleFor(snoozeAt),
                   channelId,
                   actionTypeId: 'TASKSTREAM_REMINDER_ACTIONS',
                   extra: {
@@ -310,9 +325,19 @@ function App() {
     }
 
     try {
-      const exact = await LocalNotifications.checkExactNotificationSetting?.()
-      if (exact && exact.value && exact.value !== 'granted') {
-        await LocalNotifications.changeExactNotificationSetting?.()
+      if (nativePlatform === 'android') {
+        const key = 'taskStream:exactAlarmSettingPrompted'
+        const prompted = typeof window !== 'undefined' ? localStorage.getItem(key) : null
+        const exact = await LocalNotifications.checkExactNotificationSetting?.()
+        const status = exact?.exact_alarm ?? exact?.value ?? null
+        reminderAllowWhileIdleRef.current = status === 'granted' || status === true
+        if (status && status !== 'granted' && !prompted) {
+          try {
+            localStorage.setItem(key, '1')
+          } catch {
+          }
+          await LocalNotifications.changeExactNotificationSetting?.()
+        }
       }
     } catch {
     }
@@ -364,7 +389,7 @@ function App() {
         id: id || baseId,
         title: 'Task Stream 提醒',
         body: r?.content || '提醒',
-        schedule: { at, allowWhileIdle: true },
+        schedule: reminderScheduleFor(at),
         channelId,
         actionTypeId: 'TASKSTREAM_REMINDER_ACTIONS',
         extra: {
@@ -405,13 +430,40 @@ function App() {
           id,
           title: 'Task Stream 提醒（已延后）',
           body: reminder?.content || '提醒',
-          schedule: { at: snoozeAt, allowWhileIdle: true },
+          schedule: reminderScheduleFor(snoozeAt),
           channelId,
           actionTypeId: 'TASKSTREAM_REMINDER_ACTIONS',
           extra: {
             source: 'taskstream_reminder',
             snoozed: true,
             reminder
+          }
+        }
+      ]
+    })
+  }
+
+  const testReminderNotification = async () => {
+    if (!isNativePlatform) throw new Error('仅原生容器可测试通知')
+    const LocalNotifications = await getLocalNotifications()
+    if (!LocalNotifications) throw new Error('LocalNotifications 不可用')
+    const ready = await ensureReminderNotificationsReady()
+    if (!ready) throw new Error('通知权限未授予或初始化失败')
+    const settings = loadReminderSettings()
+    const channelId = reminderChannelIdFor(settings)
+    const at = new Date(Date.now() + 10 * 1000)
+    const id = Math.floor(Date.now() % 2147483647) || 1
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id,
+          title: 'Task Stream 测试提醒',
+          body: `10 秒后触发（${new Date().toLocaleTimeString()}）`,
+          schedule: reminderScheduleFor(at),
+          channelId,
+          actionTypeId: 'TASKSTREAM_REMINDER_ACTIONS',
+          extra: {
+            source: 'taskstream_reminder_test'
           }
         }
       ]
@@ -1035,7 +1087,6 @@ function App() {
                   }} 
                   user={user} 
                   onUserUpdate={handleUserUpdate}
-                  onOpenReminderEditor={() => setShowReminderQueueModal(true)}
                 />
                 <MainContent
                   currentView={currentView}

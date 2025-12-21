@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react'
 import { getMemo, updateMemo, getUrgentTasks } from '../services/api'
 import taskEventBus from '../utils/eventBus'
 
-export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgencyClass, onAddTask, onDeleteTask, userId }) {
+export default function HomeView(props) {
+  const { todayTasks, onToggleTask, onAddTask, onDeleteTask, userId, user } = props
   const [urgentTasks, setUrgentTasks] = useState([])
   const [urgentPage, setUrgentPage] = useState(0)
   const [pageSize, setPageSize] = useState(3)
   const containerRef = useRef(null)
+  const [currentHour, setCurrentHour] = useState(() => new Date().getHours())
 
   useEffect(() => {
     const fetchUrgent = () => {
@@ -18,7 +20,6 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
     }
 
     fetchUrgent()
-    setUrgentPage(0)
 
     const handleUpdate = () => fetchUrgent()
     taskEventBus.on('task-updated', handleUpdate)
@@ -27,6 +28,14 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
       taskEventBus.off('task-updated', handleUpdate)
     }
   }, [userId])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const hour = new Date().getHours()
+      setCurrentHour(prev => (prev === hour ? prev : hour))
+    }, 60 * 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -59,17 +68,30 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
   }, [])
 
   const totalPages = Math.ceil(urgentTasks.length / pageSize) || 1
-  
-  useEffect(() => {
-    if (urgentPage >= totalPages) {
-      setUrgentPage(Math.max(0, totalPages - 1))
+
+  const safeUrgentPage = Math.min(urgentPage, Math.max(0, totalPages - 1))
+  const pagedUrgentTasks = urgentTasks.slice(safeUrgentPage * pageSize, (safeUrgentPage + 1) * pageSize)
+
+  const handlePrevUrgent = () => setUrgentPage(Math.max(0, safeUrgentPage - 1))
+  const handleNextUrgent = () => setUrgentPage(Math.min(totalPages - 1, safeUrgentPage + 1))
+
+  const unfinishedScheduleCount = todayTasks.filter(t => !t.completed).length
+  const displayName = user?.nickname || user?.username || '你'
+
+  const getWelcomeText = () => {
+    if (currentHour >= 5 && currentHour < 11) {
+      return `${displayName}早上好！今天也要继续加油哦~`
     }
-  }, [pageSize, totalPages])
-
-  const pagedUrgentTasks = urgentTasks.slice(urgentPage * pageSize, (urgentPage + 1) * pageSize)
-
-  const handlePrevUrgent = () => setUrgentPage(p => Math.max(0, p - 1))
-  const handleNextUrgent = () => setUrgentPage(p => Math.min(totalPages - 1, p + 1))
+    if (currentHour >= 11 && currentHour < 14) {
+      return `${displayName}中午好！好好休息，继续努力哦~`
+    }
+    if (currentHour >= 14 && currentHour < 18) {
+      if (unfinishedScheduleCount > 0) return `${displayName}下午好！今天还有${unfinishedScheduleCount}项日程，继续加油哦！`
+      return `${displayName}下午好！今天的日程已经完成了，真的超极棒的！`
+    }
+    if (unfinishedScheduleCount > 0) return `${displayName}晚上好！今天还有${unfinishedScheduleCount}项日程，继续加油哦！`
+    return '今天的日程结束了，好好休息吧~'
+  }
 
   function getRemainTime(dueDate) {
   const now = new Date()
@@ -161,11 +183,9 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
       {/* Column 1: Welcome + Today Tasks */}
       <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${mobileView === 0 ? 'block' : 'hidden md:flex'} h-full overflow-y-auto md:overflow-visible pb-4 md:pb-0`}>
         {/* Welcome Card */}
-        <div className="bg-gradient-to-r from-primary to-purple-400 rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden group min-h-[160px] md:h-40 shrink-0">
+        <div className="bg-gradient-to-r from-primary to-purple-400 rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden group min-h-[140px] md:h-32 shrink-0 flex items-center">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
-          <h2 className="text-2xl md:text-3xl font-bold mb-2">早安!</h2>
-          <p className="opacity-90">今天有 {todayTasks.filter(t => !t.completed).length} 项待办，请合理安排时间。</p>
-          <button className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-lg text-sm hover:bg-white/30 transition-colors">查看概览</button>
+          <h2 className="text-xl md:text-2xl font-bold leading-relaxed">{getWelcomeText()}</h2>
         </div>
         
         {/* Today Tasks */}
@@ -285,4 +305,3 @@ export default function HomeView({ todayTasks, onToggleTask, deadlines, getUrgen
     </div>
   )
 }
-
