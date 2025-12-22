@@ -25,7 +25,9 @@ export default function TaskModal({ visible, onClose, onSave, task, currentUserI
     } else {
       setTitle('')
       setDescription('')
-      const today = new Date().toISOString().split('T')[0]
+      // 获取本地时区的今天日期，避免UTC时差问题
+      const now = new Date();
+      const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
       setDate(today)
       setStartTime('09:00')
       setEndTime('10:00')

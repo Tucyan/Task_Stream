@@ -542,7 +542,9 @@ function App() {
 
   // Helper to refresh tasks
   const refreshTasks = () => {
-      const today = new Date().toISOString().split('T')[0];
+      // 获取本地时区的今天日期，避免UTC时差问题
+      const now = new Date();
+      const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
       api.getTasksInDateRange(today, today, userId)
         .then(tasks => {
            console.log('[App] refreshTasks - todayTasks raw API response:', tasks);
