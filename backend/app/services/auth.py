@@ -1,7 +1,8 @@
 # 认证服务模块
 # 提供用户注册、登录、密码更新和昵称更新等功能
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.models import models
 from app.core.database import SessionLocal
 import hashlib
@@ -11,18 +12,15 @@ import datetime
 router = APIRouter()
 
 # 数据库会话依赖项
-def get_db():
+async def get_db():
     """
     获取数据库会话
     
     返回:
-        Generator: 数据库会话生成器
+        AsyncGenerator: 异步数据库会话生成器
     """
-    db = SessionLocal()
-    try:
+    async with SessionLocal() as db:
         yield db
-    finally:
-        db.close()
 
 # 密码哈希函数
 def hash_password(password: str) -> str:
@@ -45,7 +43,7 @@ class RegisterRequest(BaseModel):
     nickname: str = None  # 昵称字段，可选
 
 @router.post("/register")
-def register(data: RegisterRequest, db: Session = Depends(get_db)):
+async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """
     用户注册接口
     
@@ -64,7 +62,8 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     nickname = data.nickname or username  # 如果没有提供昵称，使用用户名作为默认昵称
     
     # 检查用户名是否已存在
-    user = db.query(models.User).filter(models.User.username == username).first()
+    result = await db.execute(select(models.User).filter(models.User.username == username))
+    user = result.scalars().first()
     if user:
         raise HTTPException(status_code=400, detail="用户名已存在")
     
@@ -78,8 +77,8 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     
     # 保存到数据库
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    await db.commit()
+    await db.refresh(new_user)
     
     return {"id": new_user.id, "username": new_user.username, "nickname": nickname}
 
@@ -91,7 +90,7 @@ class LoginRequest(BaseModel):
     passwordHash: str
 
 @router.post("/login")
-def login(data: LoginRequest, db: Session = Depends(get_db)):
+async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     """
     用户登录接口
     
@@ -109,7 +108,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     passwordHash = data.passwordHash
     
     # 查询用户
-    user = db.query(models.User).filter(models.User.username == username).first()
+    result = await db.execute(select(models.User).filter(models.User.username == username))
+    user = result.scalars().first()
     
     # 验证用户名和密码
     if not user or user.passwordHash != passwordHash:
@@ -124,7 +124,7 @@ class UpdatePasswordRequest(BaseModel):
     new_password: str
 
 @router.put("/password")
-def update_password(data: UpdatePasswordRequest, db: Session = Depends(get_db)):
+async def update_password(data: UpdatePasswordRequest, db: AsyncSession = Depends(get_db)):
     """
     更新用户密码接口
     
@@ -140,7 +140,8 @@ def update_password(data: UpdatePasswordRequest, db: Session = Depends(get_db)):
         HTTPException: 当当前密码错误时抛出401错误
     """
     # 查询用户
-    user = db.query(models.User).filter(models.User.id == data.user_id).first()
+    result = await db.execute(select(models.User).filter(models.User.id == data.user_id))
+    user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     
@@ -152,7 +153,7 @@ def update_password(data: UpdatePasswordRequest, db: Session = Depends(get_db)):
     # 更新密码
     new_password_hash = hash_password(data.new_password)
     user.passwordHash = new_password_hash
-    db.commit()
+    await db.commit()
     
     return {"message": "密码更新成功"}
 
@@ -162,7 +163,7 @@ class UpdateNicknameRequest(BaseModel):
     new_nickname: str
 
 @router.put("/nickname")
-def update_nickname(data: UpdateNicknameRequest, db: Session = Depends(get_db)):
+async def update_nickname(data: UpdateNicknameRequest, db: AsyncSession = Depends(get_db)):
     """
     更新用户昵称接口
     
@@ -180,7 +181,8 @@ def update_nickname(data: UpdateNicknameRequest, db: Session = Depends(get_db)):
     print(f"[后端日志] 请求数据: user_id={data.user_id}, new_nickname={data.new_nickname}")
     
     # 查询用户
-    user = db.query(models.User).filter(models.User.id == data.user_id).first()
+    result = await db.execute(select(models.User).filter(models.User.id == data.user_id))
+    user = result.scalars().first()
     if not user:
         print(f"[后端日志] 用户不存在: user_id={data.user_id}")
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -192,11 +194,12 @@ def update_nickname(data: UpdateNicknameRequest, db: Session = Depends(get_db)):
     print(f"[后端日志] 更新用户昵称为: {data.new_nickname}")
     
     # 保存到数据库
-    db.commit()
+    await db.commit()
     print(f"[后端日志] 数据库提交成功")
     
     # 验证更新是否成功
-    updated_user = db.query(models.User).filter(models.User.id == data.user_id).first()
+    result = await db.execute(select(models.User).filter(models.User.id == data.user_id))
+    updated_user = result.scalars().first()
     print(f"[后端日志] 验证更新结果: 用户昵称现在是 {updated_user.name}")
     
     return {"message": "昵称更新成功", "nickname": data.new_nickname}

@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
 class User(BaseModel):
+    """用户 Schema"""
     id: int
     username: str
     created_at: str
@@ -12,21 +13,26 @@ class User(BaseModel):
         from_attributes = True
 
 class MemoBase(BaseModel):
+    """备忘录基础 Schema"""
     user_id: int
     content: Optional[str] = ""
 
 class MemoCreate(MemoBase):
+    """创建备忘录 Schema"""
     pass
 
 class MemoUpdate(BaseModel):
+    """更新备忘录 Schema"""
     content: str
 
 class Memo(MemoBase):
+    """备忘录 Schema"""
     updated_at: str
     class Config:
         from_attributes = True
 
 class TaskBase(BaseModel):
+    """任务基础 Schema"""
     user_id: int
     title: str
     description: Optional[str] = None
@@ -42,9 +48,11 @@ class TaskBase(BaseModel):
     long_term_task_id: Optional[int] = None
 
 class TaskCreate(TaskBase):
+    """创建任务 Schema"""
     pass
 
 class Task(TaskBase):
+    """任务 Schema"""
     id: int
     created_at: str
     updated_at: str
@@ -54,6 +62,7 @@ class Task(TaskBase):
         from_attributes = True
 
 class LongTermTaskBase(BaseModel):
+    """长期任务基础 Schema"""
     user_id: int
     title: str
     description: Optional[str] = None
@@ -63,9 +72,11 @@ class LongTermTaskBase(BaseModel):
     sub_task_ids: Optional[Dict[str, float]] = {}  # 格式: {"task_id": weight}，例如 {"1": 0.7, "2": 0.3}
 
 class LongTermTaskCreate(LongTermTaskBase):
+    """创建长期任务 Schema"""
     pass
 
 class LongTermTask(LongTermTaskBase):
+    """长期任务 Schema"""
     id: int
     subtasks: Optional[List[Task]] = []
     created_at: str
@@ -74,6 +85,7 @@ class LongTermTask(LongTermTaskBase):
         from_attributes = True
 
 class Journal(BaseModel):
+    """日记 Schema"""
     date: str
     user_id: int
     content: str
@@ -82,6 +94,7 @@ class Journal(BaseModel):
         from_attributes = True
 
 class AiMessage(BaseModel):
+    """AI 对话记录 Schema"""
     id: int
     user_id: int
     title: Optional[str]
@@ -92,6 +105,7 @@ class AiMessage(BaseModel):
         from_attributes = True
 
 class SettingsBase(BaseModel):
+    """设置基础 Schema"""
     user_id: int
     primary: str
     bg: str
@@ -100,9 +114,11 @@ class SettingsBase(BaseModel):
     theme_mode: str = "light"
 
 class SettingsCreate(SettingsBase):
+    """创建设置 Schema"""
     pass
 
 class SettingsUpdate(BaseModel):
+    """更新设置 Schema"""
     primary: Optional[str] = None
     bg: Optional[str] = None
     card: Optional[str] = None
@@ -110,12 +126,14 @@ class SettingsUpdate(BaseModel):
     theme_mode: Optional[str] = None
 
 class Settings(SettingsBase):
+    """设置 Schema"""
     id: int
     
     class Config:
         from_attributes = True
 
 class AIConfigBase(BaseModel):
+    """AI 配置基础 Schema"""
     user_id: int
     api_key: str
     model: str
@@ -132,9 +150,11 @@ class AIConfigBase(BaseModel):
     reminder_list: Optional[List[Dict[str, Any]]] = []
 
 class AIConfigCreate(AIConfigBase):
+    """创建 AI 配置 Schema"""
     pass
 
 class AIConfigUpdate(BaseModel):
+    """更新 AI 配置 Schema"""
     api_key: Optional[str] = None
     model: Optional[str] = None
     openai_base_url: Optional[str] = None
@@ -149,6 +169,7 @@ class AIConfigUpdate(BaseModel):
     reminder_list: Optional[List[Dict[str, Any]]] = None
 
 class AIConfig(AIConfigBase):
+    """AI 配置 Schema"""
     id: int
     class Config:
         from_attributes = True

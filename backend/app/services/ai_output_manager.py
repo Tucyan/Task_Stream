@@ -2,7 +2,21 @@
 # 负责管理AI输出流、卡片发送和用户确认处理
 import asyncio
 import json
+import datetime
+import time
 from typing import Dict, Any, List, Optional
+
+def _now_ts():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+def _log(layer: str, message: str, **fields):
+    payload = ""
+    if fields:
+        try:
+            payload = " " + json.dumps(fields, ensure_ascii=False, default=str)
+        except Exception:
+            payload = " " + str(fields)
+    print(f"[TS][{layer}] {_now_ts()} {message}{payload}")
 
 # 全局动作管理器
 class ActionManager:
@@ -28,16 +42,16 @@ class ActionManager:
         返回:
             bool: 动作结果，True表示确认，False表示取消或超时
         """
-        print(f"DEBUG_TRACE: wait_for_action {action_id} waiting (timeout={timeout})")
+        _log("ai_output_manager.action", "wait.begin", action_id=action_id, timeout_s=timeout)
         event = asyncio.Event()
         self.pending_events[action_id] = event
         try:
             await asyncio.wait_for(event.wait(), timeout=timeout)
             res = self.results.get(action_id, False)
-            print(f"DEBUG_TRACE: wait_for_action {action_id} resumed, result={res}")
+            _log("ai_output_manager.action", "wait.end", action_id=action_id, result=res)
             return res
         except asyncio.TimeoutError:
-            print(f"DEBUG_TRACE: wait_for_action {action_id} timeout")
+            _log("ai_output_manager.action", "wait.timeout", action_id=action_id)
             return False
         finally:
             self.pending_events.pop(action_id, None)
@@ -53,13 +67,13 @@ class ActionManager:
         返回:
             bool: 确认是否成功
         """
-        print(f"DEBUG_TRACE: confirm_action {action_id} called")
+        _log("ai_output_manager.action", "confirm.called", action_id=action_id)
         if action_id in self.pending_events:
             self.results[action_id] = True
             self.pending_events[action_id].set()
-            print(f"DEBUG_TRACE: confirm_action {action_id} success")
+            _log("ai_output_manager.action", "confirm.ok", action_id=action_id)
             return True
-        print(f"DEBUG_TRACE: confirm_action {action_id} failed (not found)")
+        _log("ai_output_manager.action", "confirm.miss", action_id=action_id)
         return False
 
     def cancel_action(self, action_id: str):
@@ -72,13 +86,13 @@ class ActionManager:
         返回:
             bool: 取消是否成功
         """
-        print(f"DEBUG_TRACE: cancel_action {action_id} called")
+        _log("ai_output_manager.action", "cancel.called", action_id=action_id)
         if action_id in self.pending_events:
             self.results[action_id] = False
             self.pending_events[action_id].set()
-            print(f"DEBUG_TRACE: cancel_action {action_id} success")
+            _log("ai_output_manager.action", "cancel.ok", action_id=action_id)
             return True
-        print(f"DEBUG_TRACE: cancel_action {action_id} failed (not found)")
+        _log("ai_output_manager.action", "cancel.miss", action_id=action_id)
         return False
 
 global_action_manager = ActionManager()
@@ -103,6 +117,25 @@ class OutputManager:
         self.mixed_buffer = [] 
         # current_text_buffer 用于临时累积当前的文本片段，以便合并存储
         self.current_text_buffer = []
+        self._trace_partial_count = 0
+        self._trace_card_count = 0
+        self._trace_last_partial_log_at = 0.0
+    
+    def _now_ts(self):
+        return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    
+    def _log(self, layer: str, message: str, **fields):
+        base = {
+            "user_id": getattr(self, "_trace_user_id", None),
+            "dialogue_id": getattr(self, "_trace_dialogue_id", None),
+        }
+        base.update(fields)
+        payload = ""
+        try:
+            payload = json.dumps(base, ensure_ascii=False, default=str)
+        except Exception:
+            payload = str(base)
+        print(f"[TS][{layer}] {self._now_ts()} {message} {payload}")
 
     def _flush_text_buffer(self):
         """将当前累积的文本合并为一个 type=0 的片段放入 mixed_buffer"""
@@ -118,12 +151,25 @@ class OutputManager:
         参数:
             text: 要输出的文本片段
         """
+        self._trace_partial_count += 1
+        now = time.perf_counter()
+        should_log = self._trace_partial_count <= 5 or (self._trace_partial_count % 50 == 0) or (now - self._trace_last_partial_log_at >= 1.5)
+        if should_log:
+            self._trace_last_partial_log_at = now
+            sample = text
+            if isinstance(sample, str) and len(sample) > 80:
+                sample = sample[:80] + "..."
+            self._log("ai_output_manager.stream_text", "enqueue.partial_text", seq=self._trace_partial_count, len=len(text or ""), sample=sample)
         self.current_text_buffer.append(text)
         # 实时发送 SSE 事件
-        await self.queue.put({
-            "event": "partial_text",
-            "data": json.dumps({"content": text, "delta": text, "finished": False})
-        })
+        try:
+            await self.queue.put({
+                "event": "partial_text",
+                "data": json.dumps({"content": text, "delta": text, "finished": False})
+            })
+        except Exception as e:
+            self._log("ai_output_manager.stream_text", "enqueue.partial_text.error", err=str(e))
+            raise
 
     async def send_card(self, card_data: dict, need_confirm: bool) -> bool:
         """
@@ -153,13 +199,26 @@ class OutputManager:
         # 将卡片放入 mixed_buffer
         self.mixed_buffer.append(card_data)
         
-        print(f"DEBUG: OutputManager sending card {action_id}, need_confirm={need_confirm}")
+        self._trace_card_count += 1
+        self._log(
+            "ai_output_manager.send_card",
+            "enqueue.cards",
+            seq=self._trace_card_count,
+            action_id=action_id,
+            need_confirm=need_confirm,
+            card_type=card_data.get("type"),
+            data_keys=list((card_data.get("data") or {}).keys()) if isinstance(card_data.get("data"), dict) else None,
+        )
         
         # 实时发送 SSE 事件
-        await self.queue.put({
-            "event": "cards", 
-            "data": json.dumps({"cards": [card_data]})
-        })
+        try:
+            await self.queue.put({
+                "event": "cards", 
+                "data": json.dumps({"cards": [card_data]})
+            })
+        except Exception as e:
+            self._log("ai_output_manager.send_card", "enqueue.cards.error", action_id=action_id, err=str(e))
+            raise
         
         # 强制交出控制权，确保 SSE 消费者有机会立即发送卡片
         # 特别是在自动确认开启时，后续可能会立即执行阻塞的 CRUD 操作
@@ -169,9 +228,9 @@ class OutputManager:
             return True
 
         # 使用全局管理器挂起，等待用户确认
-        print(f"DEBUG: Waiting for action {action_id}...")
+        self._log("ai_output_manager.send_card", "wait_for_action.begin", action_id=action_id)
         result = await global_action_manager.wait_for_action(action_id, timeout=30)
-        print(f"DEBUG: Action {action_id} finished with result {result}")
+        self._log("ai_output_manager.send_card", "wait_for_action.end", action_id=action_id, result=result)
         
         card_data["user_confirmation"] = "Y" if result else "N"
         
@@ -198,17 +257,20 @@ class OutputManager:
             if item["type"] == 0
         ])
         
+        self._log("ai_output_manager.end_stream", "enqueue.text_done", dialogue_id=dialogue_id, text_len=len(all_text or ""))
         await self.queue.put({
             "event": "text_done",
             "data": json.dumps({"content": all_text})
         })
         
         # 发送结束事件
+        self._log("ai_output_manager.end_stream", "enqueue.end", dialogue_id=dialogue_id)
         await self.queue.put({
             "event": "end",
             "data": json.dumps({"dialogue_id": dialogue_id})
         })
         # 发送结束标记
+        self._log("ai_output_manager.end_stream", "enqueue.none", dialogue_id=dialogue_id)
         await self.queue.put(None)
 
     async def send_error(self, message: str):
@@ -218,11 +280,13 @@ class OutputManager:
         参数:
             message: 错误信息
         """
+        self._log("ai_output_manager.send_error", "enqueue.error", message=message)
         await self.queue.put({
             "event": "error",
             "data": json.dumps({"message": message})
         })
         # 发送结束标记
+        self._log("ai_output_manager.send_error", "enqueue.none")
         await self.queue.put(None)
 
     def get_final_content(self) -> List[dict]:

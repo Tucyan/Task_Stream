@@ -42,6 +42,21 @@ export default function AiAssistantView() {
     const activeStreamDialogueIdRef = useRef(null);
     const abortControllerRef = useRef(null);
     const cacheWriteTimeoutRef = useRef(null);
+    const streamTraceRef = useRef({ chunk: 0, eventLine: 0, dataLine: 0, partial: 0, cards: 0, errors: 0 });
+
+    const nowTs = () => new Date().toISOString();
+
+    const traceLog = (layer, message, fields) => {
+        let payload = '';
+        if (fields && typeof fields === 'object') {
+            try {
+                payload = ' ' + JSON.stringify(fields);
+            } catch {
+                payload = ' ' + String(fields);
+            }
+        }
+        console.log(`[TS][${layer}] ${nowTs()} ${message}${payload}`);
+    };
 
     const getLastDialogueKey = (uid) => `taskStreamAi:lastDialogueId:${uid}`;
     const getPendingActionsKey = (uid) => `taskStreamAi:pendingActions:${uid}`;
@@ -454,46 +469,74 @@ export default function AiAssistantView() {
         setMessages(prev => [...prev, assistantMsg]);
 
         try {
+            streamTraceRef.current = { chunk: 0, eventLine: 0, dataLine: 0, partial: 0, cards: 0, errors: 0 };
             const { url, options } = api.getChatStreamOptions(targetDialogueId, userId, text);
+            traceLog('FE.SSE', 'stream.start', { dialogueId: targetDialogueId, userId, contentLen: text.length });
             const controller = new AbortController();
             abortControllerRef.current = controller;
             const response = await fetch(`${api.API_BASE_URL || 'http://localhost:8000'}${url}`, { ...options, signal: controller.signal });
             
+            traceLog('FE.SSE', 'fetch.response', { ok: response.ok, status: response.status, statusText: response.statusText });
             if (!response.ok) throw new Error(response.statusText);
             
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
             let currentEvent = null;
+            const yieldToBrowser = () => new Promise(resolve => requestAnimationFrame(() => resolve()));
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 
                 const chunk = decoder.decode(value, { stream: true });
+                streamTraceRef.current.chunk += 1;
+                const chunkSeq = streamTraceRef.current.chunk;
+                if (chunkSeq <= 5 || chunkSeq % 50 === 0) {
+                    const sample = chunk.length > 160 ? chunk.slice(0, 160) + '...' : chunk;
+                    traceLog('FE.SSE', 'recv.chunk', { seq: chunkSeq, len: chunk.length, sample });
+                }
                 const lines = (buffer + chunk).split('\n');
                 buffer = lines.pop();
 
                 for (const line of lines) {
                     if (line.startsWith('event: ')) {
                         currentEvent = line.substring(7).trim();
+                        streamTraceRef.current.eventLine += 1;
+                        const evSeq = streamTraceRef.current.eventLine;
+                        if (evSeq <= 8) {
+                            traceLog('FE.SSE', 'recv.event_line', { seq: evSeq, event: currentEvent });
+                        }
                     } else if (line.startsWith('data: ')) {
                         const dataStr = line.substring(6).trim();
                         if (!dataStr) continue;
                         
                         try {
+                            streamTraceRef.current.dataLine += 1;
+                            const dataSeq = streamTraceRef.current.dataLine;
+                            if (currentEvent === 'cards' || currentEvent === 'error' || dataSeq <= 6) {
+                                const sample = dataStr.length > 200 ? dataStr.slice(0, 200) + '...' : dataStr;
+                                traceLog('FE.SSE', 'recv.data_line', { seq: dataSeq, event: currentEvent, len: dataStr.length, sample });
+                            }
                             const data = JSON.parse(dataStr);
                             handleStreamEvent(currentEvent, data);
+                            if (currentEvent === 'cards') {
+                                await yieldToBrowser();
+                            }
                         } catch (e) {
                             console.error("Parse error", e);
                         }
                     }
                 }
             }
+            traceLog('FE.SSE', 'stream.done', { dialogueId: targetDialogueId, ...streamTraceRef.current });
         } catch (e) {
             if (e?.name !== 'AbortError') {
                 console.error(e);
+                traceLog('FE.SSE', 'stream.error', { message: String(e?.message || e) });
                 setMessages(prev => [...prev, { role: 'system', content: "Error: " + e.message }]);
+            } else {
+                traceLog('FE.SSE', 'stream.abort', { dialogueId: targetDialogueId });
             }
         } finally {
             setIsStreaming(false);
@@ -502,7 +545,33 @@ export default function AiAssistantView() {
     };
 
     const handleStreamEvent = (event, data) => {
+        if (event !== 'partial_text' && event !== 'cards' && event !== 'error') return;
+        const did = activeStreamDialogueIdRef.current ?? currentDialogueIdRef.current;
+        const uid = userIdRef.current;
+        if (event === 'partial_text') {
+            streamTraceRef.current.partial += 1;
+            const seq = streamTraceRef.current.partial;
+            if (seq <= 5 || seq % 50 === 0) {
+                const t = data?.delta !== undefined ? data.delta : data?.content;
+                const sample = typeof t === 'string' ? (t.length > 60 ? t.slice(0, 60) + '...' : t) : '';
+                traceLog('FE.EVENT', 'partial_text', { dialogueId: did, userId: uid, seq, len: (t || '').length, sample });
+            }
+        } else if (event === 'cards') {
+            streamTraceRef.current.cards += 1;
+            const cards = Array.isArray(data?.cards) ? data.cards : [];
+            traceLog('FE.EVENT', 'cards', {
+                dialogueId: did,
+                userId: uid,
+                seq: streamTraceRef.current.cards,
+                cardCount: cards.length,
+                types: cards.map(c => c?.type)
+            });
+        } else if (event === 'error') {
+            streamTraceRef.current.errors += 1;
+            traceLog('FE.EVENT', 'error', { dialogueId: did, userId: uid, message: data?.message });
+        }
         setMessages(prev => {
+            const startedAt = performance.now();
             const newMessages = [...prev];
             const lastMsgIndex = newMessages.length - 1;
             // Deep copy the last message and its content to ensure immutability
@@ -572,6 +641,10 @@ export default function AiAssistantView() {
                 lastMsg.content.push({ type: 'text', text: `\n[Error: ${data.message}]` });
             }
 
+            const costMs = Math.round(performance.now() - startedAt);
+            if (event === 'cards' || costMs >= 8) {
+                traceLog('FE.RENDER', 'setMessages.applied', { dialogueId: did, userId: uid, event, costMs, segments: lastMsg.content.length });
+            }
             return newMessages;
         });
     };

@@ -73,7 +73,7 @@ env_file = debug_env_loading()
 if env_file:
     load_dotenv(env_file)
 
-# AI Configuration with better error handling
+# AI配置，包含更好的错误处理
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "qwen-plus")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")

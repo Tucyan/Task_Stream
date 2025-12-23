@@ -47,7 +47,7 @@ async function request(url, options = {}) {
                 console.log('[API请求] sub_task_ids:', bodyData.sub_task_ids);
                 console.log('[API请求] sub_task_ids类型:', typeof bodyData.sub_task_ids);
                 console.log('[API请求] sub_task_ids字符串:', JSON.stringify(bodyData.sub_task_ids));
-            } catch (e) {
+            } catch {
                 console.log('[API请求] 请求体:', options.body);
             }
         }

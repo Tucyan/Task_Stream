@@ -5,10 +5,23 @@ from pathlib import Path
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from app.services import ai_config_service
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import OPENAI_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL
 
-def init_agent_executor(user_id: int, db: Session, tools):
+def _now_ts():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+def _log(layer: str, message: str, **fields):
+    line = f"[TS][{layer}] {_now_ts()} {message}"
+    if fields:
+        try:
+            import json
+            line += " " + json.dumps(fields, ensure_ascii=False, default=str)
+        except Exception:
+            line += " " + str(fields)
+    print(line)
+
+async def init_agent_executor(user_id: int, db: AsyncSession, tools):
     """
     初始化AI代理执行器
     
@@ -20,7 +33,7 @@ def init_agent_executor(user_id: int, db: Session, tools):
     返回:
         agent: 初始化完成的AI代理执行器
     """
-    config = ai_config_service.get_ai_config(db, user_id)
+    config = await ai_config_service.get_ai_config(db, user_id)
     
     # 获取API密钥，优先使用用户配置，其次使用环境变量
     api_key = config.api_key if (config and config.api_key) else OPENAI_API_KEY
@@ -29,11 +42,11 @@ def init_agent_executor(user_id: int, db: Session, tools):
     # 获取模型名称，优先使用用户配置，其次使用环境变量，最后使用默认配置
     model_name = config.model if (config and config.model) else OPENAI_MODEL
     
-    print(f"DEBUG: initializing agent. Model: {model_name}, BaseURL: {base_url}")
-    print(f"DEBUG: API Key loaded: {'Yes' if api_key else 'No'} ({api_key[:5]}... if present)")
+    _log("ai_agent.init", "llm.config", user_id=user_id, model=model_name, base_url=base_url, has_api_key=bool(api_key))
 
     # Fallback key if not set
     if not api_key:
+        _log("ai_agent.init", "llm.api_key.missing", user_id=user_id)
         api_key = "sk-placeholder" 
 
     llm = ChatOpenAI(
@@ -47,7 +60,7 @@ def init_agent_executor(user_id: int, db: Session, tools):
     
     character = config.character if (config and config.character) else "默认"
     
-    # Character Presets
+    # 角色预设
     CHARACTER_PROMPTS = {
         "默认": "你是一个乐于助人的助手。",
         "温柔": "你是一个温柔体贴的助手，说话语气温和，总是给予用户鼓励和支持，像一位知心朋友。",

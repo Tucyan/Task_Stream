@@ -1,13 +1,14 @@
 import json
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+from sqlalchemy import select, func
 from typing import List, Optional
 from app.models import models
 from app.schemas import schemas
-from sqlalchemy import func
 import calendar
 from datetime import datetime
 
-def create_task(task: schemas.TaskCreate, db: Session) -> schemas.Task:
+async def create_task(task: schemas.TaskCreate, db: AsyncSession) -> schemas.Task:
     """
     创建新任务
     
@@ -36,16 +37,16 @@ def create_task(task: schemas.TaskCreate, db: Session) -> schemas.Task:
         long_term_task_id=task.long_term_task_id
     )
     db.add(db_task)
-    db.commit()
-    db.refresh(db_task)
+    await db.commit()
+    await db.refresh(db_task)
     
     # 如果任务关联了长期任务，自动计算并更新长期任务的进度
     if db_task.long_term_task_id:
-        update_long_term_task_progress(db_task.long_term_task_id, db)
+        await update_long_term_task_progress(db_task.long_term_task_id, db)
     
     return map_task_to_schema(db_task)
 
-def delete_task(task_id: int, db: Session) -> bool:
+async def delete_task(task_id: int, db: AsyncSession) -> bool:
     """
     删除指定ID的任务
     
@@ -56,23 +57,24 @@ def delete_task(task_id: int, db: Session) -> bool:
     返回:
         bool: 删除是否成功
     """
-    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    result = await db.execute(select(models.Task).filter(models.Task.id == task_id))
+    db_task = result.scalars().first()
     if not db_task:
         return False
     
     # 记录任务关联的长期任务ID，用于后续更新进度
     long_term_task_id = db_task.long_term_task_id
     
-    db.delete(db_task)
-    db.commit()
+    await db.delete(db_task)
+    await db.commit()
     
     # 如果任务关联了长期任务，自动计算并更新长期任务的进度
     if long_term_task_id:
-        update_long_term_task_progress(long_term_task_id, db)
+        await update_long_term_task_progress(long_term_task_id, db)
     
     return True
 
-def create_long_term_task(task: schemas.LongTermTaskCreate, db: Session) -> schemas.LongTermTask:
+async def create_long_term_task(task: schemas.LongTermTaskCreate, db: AsyncSession) -> schemas.LongTermTask:
     """
     创建长期任务
     
@@ -94,8 +96,8 @@ def create_long_term_task(task: schemas.LongTermTaskCreate, db: Session) -> sche
         sub_task_ids=json.dumps(task.sub_task_ids) if task.sub_task_ids else "{}"
     )
     db.add(db_lt)
-    db.commit()
-    db.refresh(db_lt)
+    await db.commit()
+    await db.refresh(db_lt)
     
     if task.sub_task_ids:
         old_long_term_task_ids = set()
@@ -105,10 +107,11 @@ def create_long_term_task(task: schemas.LongTermTaskCreate, db: Session) -> sche
             except (TypeError, ValueError):
                 continue
             
-            db_task = db.query(models.Task).filter(
+            result = await db.execute(select(models.Task).filter(
                 models.Task.id == task_id,
                 models.Task.user_id == task.user_id
-            ).first()
+            ))
+            db_task = result.scalars().first()
             if not db_task:
                 continue
             
@@ -117,15 +120,15 @@ def create_long_term_task(task: schemas.LongTermTaskCreate, db: Session) -> sche
             
             db_task.long_term_task_id = db_lt.id
         
-        db.commit()
-        update_long_term_task_progress(db_lt.id, db)
+        await db.commit()
+        await update_long_term_task_progress(db_lt.id, db)
         for old_id in old_long_term_task_ids:
-            update_long_term_task_progress(old_id, db)
-        db.refresh(db_lt)
+            await update_long_term_task_progress(old_id, db)
+        await db.refresh(db_lt)
     
-    return map_long_term_task_to_schema(db, db_lt)
+    return await map_long_term_task_to_schema(db, db_lt)
 
-def delete_long_term_task(task_id: int, db: Session) -> bool:
+async def delete_long_term_task(task_id: int, db: AsyncSession) -> bool:
     """
     删除长期任务
     
@@ -136,11 +139,12 @@ def delete_long_term_task(task_id: int, db: Session) -> bool:
     返回:
         bool: 删除是否成功
     """
-    db_lt = db.query(models.LongTermTask).filter(models.LongTermTask.id == task_id).first()
+    result = await db.execute(select(models.LongTermTask).filter(models.LongTermTask.id == task_id))
+    db_lt = result.scalars().first()
     if not db_lt:
         return False
-    db.delete(db_lt)
-    db.commit()
+    await db.delete(db_lt)
+    await db.commit()
     return True
 
 def map_task_to_schema(t: models.Task) -> schemas.Task:
@@ -189,7 +193,7 @@ def map_task_to_schema(t: models.Task) -> schemas.Task:
         long_term_task=long_term_task
     )
 
-def map_long_term_task_to_schema(db: Session, lt: models.LongTermTask) -> schemas.LongTermTask:
+async def map_long_term_task_to_schema(db: AsyncSession, lt: models.LongTermTask) -> schemas.LongTermTask:
     # 处理新的数据格式: {"task_id": weight}
     # 添加错误处理，防止sub_task_ids为None或无效JSON
     try:
@@ -205,7 +209,8 @@ def map_long_term_task_to_schema(db: Session, lt: models.LongTermTask) -> schema
     subtasks = []
     if sub_task_ids:
         task_ids = list(sub_task_ids.keys())
-        tasks = db.query(models.Task).filter(models.Task.id.in_(task_ids)).all()
+        result = await db.execute(select(models.Task).filter(models.Task.id.in_(task_ids)))
+        tasks = result.scalars().all()
         subtasks = [map_task_to_schema(t) for t in tasks]
         
     return schemas.LongTermTask(
@@ -221,53 +226,59 @@ def map_long_term_task_to_schema(db: Session, lt: models.LongTermTask) -> schema
         sub_task_ids=sub_task_ids
     )
 
-def get_task_by_id(task_id: int, db: Session) -> Optional[schemas.Task]:
-    task = db.query(models.Task).options(
+async def get_task_by_id(task_id: int, db: AsyncSession) -> Optional[schemas.Task]:
+    result = await db.execute(select(models.Task).options(
         joinedload(models.Task.long_term_task)
-    ).filter(models.Task.id == task_id).first()
+    ).filter(models.Task.id == task_id))
+    task = result.scalars().first()
     if not task:
         return None
     return map_task_to_schema(task)
 
-def get_tasks_in_date_range(start_date: str, end_date: str, user_id: int, db: Session) -> List[schemas.Task]:
-    tasks = db.query(models.Task).options(
+async def get_tasks_in_date_range(start_date: str, end_date: str, user_id: int, db: AsyncSession) -> List[schemas.Task]:
+    result = await db.execute(select(models.Task).options(
         joinedload(models.Task.long_term_task)
     ).filter(
         models.Task.user_id == user_id,
         models.Task.assigned_date >= start_date,
         models.Task.assigned_date <= end_date
-    ).all()
+    ))
+    tasks = result.scalars().all()
     return [map_task_to_schema(t) for t in tasks]
 
-def get_all_tasks_for_user(user_id: int, db: Session) -> List[schemas.Task]:
-    tasks = db.query(models.Task).options(
+async def get_all_tasks_for_user(user_id: int, db: AsyncSession) -> List[schemas.Task]:
+    result = await db.execute(select(models.Task).options(
         joinedload(models.Task.long_term_task)
-    ).filter(models.Task.user_id == user_id).all()
+    ).filter(models.Task.user_id == user_id))
+    tasks = result.scalars().all()
     return [map_task_to_schema(t) for t in tasks]
 
-def get_all_long_term_tasks(user_id: int, db: Session) -> List[schemas.LongTermTask]:
-    lts = db.query(models.LongTermTask).filter(models.LongTermTask.user_id == user_id).all()
-    return [map_long_term_task_to_schema(db, lt) for lt in lts]
+async def get_all_long_term_tasks(user_id: int, db: AsyncSession) -> List[schemas.LongTermTask]:
+    result = await db.execute(select(models.LongTermTask).filter(models.LongTermTask.user_id == user_id))
+    lts = result.scalars().all()
+    return [await map_long_term_task_to_schema(db, lt) for lt in lts]
 
-def get_all_uncompleted_long_term_tasks(user_id: int, db: Session) -> List[schemas.LongTermTask]:
-    lts = db.query(models.LongTermTask).filter(
+async def get_all_uncompleted_long_term_tasks(user_id: int, db: AsyncSession) -> List[schemas.LongTermTask]:
+    result = await db.execute(select(models.LongTermTask).filter(
         models.LongTermTask.user_id == user_id,
         models.LongTermTask.progress < 1.0
-    ).order_by(models.LongTermTask.due_date).all()
-    return [map_long_term_task_to_schema(db, lt) for lt in lts]
+    ).order_by(models.LongTermTask.due_date))
+    lts = result.scalars().all()
+    return [await map_long_term_task_to_schema(db, lt) for lt in lts]
 
-def update_task(task_id: int, updated_task: schemas.Task, db: Session) -> bool:
-    print(f"CRUD: Updating task {task_id}")
-    print(f"CRUD: Updated task data: {updated_task.dict()}")
+async def update_task(task_id: int, updated_task: schemas.Task, db: AsyncSession) -> bool:
+    print(f"CRUD: 正在更新任务 {task_id}")
+    print(f"CRUD: 更新后的任务数据: {updated_task.dict()}")
     
-    db_task = db.query(models.Task).options(
+    result = await db.execute(select(models.Task).options(
         joinedload(models.Task.long_term_task)
-    ).filter(models.Task.id == task_id).first()
+    ).filter(models.Task.id == task_id))
+    db_task = result.scalars().first()
     if not db_task:
-        print(f"CRUD: Task {task_id} not found")
+        print(f"CRUD: 未找到任务 {task_id}")
         return False
     
-    print(f"CRUD: Original task data: id={db_task.id}, title={db_task.title}, status={db_task.status}")
+    print(f"CRUD: 原始任务数据: id={db_task.id}, title={db_task.title}, status={db_task.status}")
     
     # 记录原始状态和长期任务ID，用于后续计算进度
     original_status = db_task.status
@@ -290,23 +301,24 @@ def update_task(task_id: int, updated_task: schemas.Task, db: Session) -> bool:
     print(f"[[[[[After update: long_term_task_id={db_task.long_term_task_id}")
     print(f"[[[[[task_id: {task_id} title: {db_task.title}]")
 
-    print(f"CRUD: Committing changes to database")
-    db.commit()
-    db.refresh(db_task)
-    print(f"CRUD: Task updated successfully")
+    print(f"CRUD: 正在提交更改到数据库")
+    await db.commit()
+    await db.refresh(db_task)
+    print(f"CRUD: 任务更新成功")
     
     # # 如果任务关联了长期任务，自动计算并更新长期任务的进度
     if db_task.long_term_task_id:
-        update_long_term_task_progress(db_task.long_term_task_id, db)
+        await update_long_term_task_progress(db_task.long_term_task_id, db)
     
     # # 如果任务原本关联了长期任务但现在取消了关联，也需要重新计算原长期任务的进度
     if original_long_term_task_id and original_long_term_task_id != db_task.long_term_task_id:
-        update_long_term_task_progress(original_long_term_task_id, db)
+        await update_long_term_task_progress(original_long_term_task_id, db)
     
     return True
 
-def update_long_term_task(task_id: int, updated_task: schemas.LongTermTask, db: Session) -> bool:
-    db_lt = db.query(models.LongTermTask).filter(models.LongTermTask.id == task_id).first()
+async def update_long_term_task(task_id: int, updated_task: schemas.LongTermTask, db: AsyncSession) -> bool:
+    result = await db.execute(select(models.LongTermTask).filter(models.LongTermTask.id == task_id))
+    db_lt = result.scalars().first()
     if not db_lt:
         return False
     
@@ -338,39 +350,42 @@ def update_long_term_task(task_id: int, updated_task: schemas.LongTermTask, db: 
         db_lt.sub_task_ids = final_sub_task_ids
         print(f"[crud.py] 最终保存的sub_task_ids: {final_sub_task_ids}")
     
-    db.commit()
+    await db.commit()
     
     # 更新子任务后，重新计算进度
     if updated_task.sub_task_ids is not None:
-        update_long_term_task_progress(task_id, db)
+        await update_long_term_task_progress(task_id, db)
     
     return True
 
-def get_journals_in_date_range(start_date: str, end_date: str, user_id: int, db: Session) -> List[schemas.Journal]:
-    journals = db.query(models.Journal).filter(
+async def get_journals_in_date_range(start_date: str, end_date: str, user_id: int, db: AsyncSession) -> List[schemas.Journal]:
+    result = await db.execute(select(models.Journal).filter(
         models.Journal.user_id == user_id,
         models.Journal.date >= start_date,
         models.Journal.date <= end_date
-    ).order_by(models.Journal.date).all()
+    ).order_by(models.Journal.date))
+    journals = result.scalars().all()
     return [schemas.Journal(date=j.date, user_id=j.user_id, content=j.content) for j in journals]
 
-def get_journal_by_date(date: str, user_id: int, db: Session) -> Optional[schemas.Journal]:
-    journal = db.query(models.Journal).filter(models.Journal.date == date, models.Journal.user_id == user_id).first()
+async def get_journal_by_date(date: str, user_id: int, db: AsyncSession) -> Optional[schemas.Journal]:
+    result = await db.execute(select(models.Journal).filter(models.Journal.date == date, models.Journal.user_id == user_id))
+    journal = result.scalars().first()
     if journal:
         return schemas.Journal(date=journal.date, user_id=journal.user_id, content=journal.content)
     return None
 
-def update_journal_content(date: str, new_content: str, user_id: int, db: Session) -> bool:
-    journal = db.query(models.Journal).filter(models.Journal.date == date, models.Journal.user_id == user_id).first()
+async def update_journal_content(date: str, new_content: str, user_id: int, db: AsyncSession) -> bool:
+    result = await db.execute(select(models.Journal).filter(models.Journal.date == date, models.Journal.user_id == user_id))
+    journal = result.scalars().first()
     if journal:
         journal.content = new_content
     else:
         journal = models.Journal(date=date, user_id=user_id, content=new_content)
         db.add(journal)
-    db.commit()
+    await db.commit()
     return True
 
-def get_heatmap_data(year: int, month: int, user_id: int, db: Session) -> List[int]:
+async def get_heatmap_data(year: int, month: int, user_id: int, db: AsyncSession) -> List[int]:
     # 构造本月的起始日期
     start_date = f"{year}-{month:02d}-01"
     # 构造本月的结束日期（下个月的第一天）
@@ -380,12 +395,13 @@ def get_heatmap_data(year: int, month: int, user_id: int, db: Session) -> List[i
         end_date = f"{year}-{month+1:02d}-01"
     
     # 查询本月属于该用户且状态为3的所有任务
-    tasks = db.query(models.Task).filter(
+    result = await db.execute(select(models.Task).filter(
         models.Task.user_id == user_id,
         models.Task.status == 3,
         models.Task.assigned_date >= start_date,
         models.Task.assigned_date < end_date
-    ).all()
+    ))
+    tasks = result.scalars().all()
     
     # 获取本月天数，初始化每天任务完成数列表
     days_in_month = calendar.monthrange(year, month)[1]
@@ -419,7 +435,7 @@ def get_heatmap_data(year: int, month: int, user_id: int, db: Session) -> List[i
     result = [get_level(x) for x in heatmap]
     return result
 
-def get_journal_dates(year: int, month: int, user_id: int, db: Session) -> List[int]:
+async def get_journal_dates(year: int, month: int, user_id: int, db: AsyncSession) -> List[int]:
     # 构造本月的起始日期
     start_date = f"{year}-{month:02d}-01"
     # 构造本月的结束日期（下个月的第一天）
@@ -429,11 +445,12 @@ def get_journal_dates(year: int, month: int, user_id: int, db: Session) -> List[
         end_date = f"{year}-{month+1:02d}-01"
     
     # 查询本月属于该用户的所有日志
-    journals = db.query(models.Journal).filter(
+    result = await db.execute(select(models.Journal).filter(
         models.Journal.user_id == user_id,
         models.Journal.date >= start_date,
         models.Journal.date < end_date
-    ).all()
+    ))
+    journals = result.scalars().all()
     
     # 提取所有有日志的日期（日）
     journal_days = []
@@ -446,7 +463,7 @@ def get_journal_dates(year: int, month: int, user_id: int, db: Session) -> List[
             
     return sorted(list(set(journal_days)))
 
-def get_journal_status_list(year: int, month: int, user_id: int, db: Session) -> List[bool]:
+async def get_journal_status_list(year: int, month: int, user_id: int, db: AsyncSession) -> List[bool]:
     """
     获取指定用户指定月份的日志状态列表
     返回一个布尔列表，每个元素对应当月的一天，True表示有日志，False表示无日志
@@ -466,11 +483,12 @@ def get_journal_status_list(year: int, month: int, user_id: int, db: Session) ->
         end_date = f"{year}-{month+1:02d}-01"
     
     # 查询本月属于该用户的所有日志
-    journals = db.query(models.Journal).filter(
+    result = await db.execute(select(models.Journal).filter(
         models.Journal.user_id == user_id,
         models.Journal.date >= start_date,
         models.Journal.date < end_date
-    ).all()
+    ))
+    journals = result.scalars().all()
     
     # 更新状态列表
     for journal in journals:
@@ -483,7 +501,7 @@ def get_journal_status_list(year: int, month: int, user_id: int, db: Session) ->
             
     return status_list
 
-def update_long_term_task_progress(long_term_task_id: int, db: Session) -> bool:
+async def update_long_term_task_progress(long_term_task_id: int, db: AsyncSession) -> bool:
     """
     根据关联的子任务状态自动计算并更新长期任务的进度
     考虑每个子任务的权重/比例
@@ -491,13 +509,15 @@ def update_long_term_task_progress(long_term_task_id: int, db: Session) -> bool:
     print(f"CRUD: Updating progress for long-term task {long_term_task_id}")
     
     # 获取长期任务
-    long_term_task = db.query(models.LongTermTask).filter(models.LongTermTask.id == long_term_task_id).first()
+    result = await db.execute(select(models.LongTermTask).filter(models.LongTermTask.id == long_term_task_id))
+    long_term_task = result.scalars().first()
     if not long_term_task:
         print(f"CRUD: Long-term task {long_term_task_id} not found")
         return False
     
     # 获取所有关联的子任务
-    subtasks = db.query(models.Task).filter(models.Task.long_term_task_id == long_term_task_id).all()
+    result = await db.execute(select(models.Task).filter(models.Task.long_term_task_id == long_term_task_id))
+    subtasks = result.scalars().all()
     
     if not subtasks:
         print(f"CRUD: No subtasks found for long-term task {long_term_task_id}")
@@ -554,27 +574,29 @@ def update_long_term_task_progress(long_term_task_id: int, db: Session) -> bool:
         long_term_task.progress = progress
         long_term_task.sub_task_ids = json.dumps(sub_task_ids)
         
-        print(f"CRUD: Updated weighted progress for long-term task {long_term_task_id}: {progress} (total weight: {total_weight}, completed weight: {completed_weight}, calculation method: {'direct' if total_weight <= 1.0 else 'ratio'})")
+        print(f"CRUD: 已更新长期任务 {long_term_task_id} 的加权进度: {progress} (总权重: {total_weight}, 已完成权重: {completed_weight}, 计算方法: {'直接计算' if total_weight <= 1.0 else '比例计算'})")
     
-    db.commit()
-    print(f"CRUD: Long-term task progress updated successfully")
+    await db.commit()
+    print(f"CRUD: 长期任务进度更新成功")
     return True
 
-def get_urgent_tasks(user_id: int, db: Session) -> List[dict]:
+async def get_urgent_tasks(user_id: int, db: AsyncSession) -> List[dict]:
     # 获取所有有截止时间且未完成的短期任务（status != 3）
-    short_tasks = db.query(models.Task).filter(
+    result = await db.execute(select(models.Task).filter(
         models.Task.user_id == user_id,
         models.Task.due_date.isnot(None),
         models.Task.due_date != "",
         models.Task.status != 3
-    ).all()
+    ))
+    short_tasks = result.scalars().all()
     # 获取所有有截止时间且未完成的长期任务（progress < 1.0）
-    long_tasks = db.query(models.LongTermTask).filter(
+    result = await db.execute(select(models.LongTermTask).filter(
         models.LongTermTask.user_id == user_id,
         models.LongTermTask.due_date.isnot(None),
         models.LongTermTask.due_date != "",
         models.LongTermTask.progress < 1.0
-    ).all()
+    ))
+    long_tasks = result.scalars().all()
 
     urgent_list = []
     for t in short_tasks:
@@ -595,7 +617,7 @@ def get_urgent_tasks(user_id: int, db: Session) -> List[dict]:
     urgent_list.sort(key=lambda x: x["due_date"])
     return urgent_list
 
-def get_long_term_task_by_id(task_id: int, db: Session) -> Optional[schemas.LongTermTask]:
+async def get_long_term_task_by_id(task_id: int, db: AsyncSession) -> Optional[schemas.LongTermTask]:
     """
     根据ID获取长期任务
     
@@ -606,16 +628,18 @@ def get_long_term_task_by_id(task_id: int, db: Session) -> Optional[schemas.Long
     返回：
         LongTermTask对象或None
     """
-    long_term_task = db.query(models.LongTermTask).filter(models.LongTermTask.id == task_id).first()
+    result = await db.execute(select(models.LongTermTask).filter(models.LongTermTask.id == task_id))
+    long_term_task = result.scalars().first()
     if not long_term_task:
         return None
         
-    return map_long_term_task_to_schema(db, long_term_task)
+    return await map_long_term_task_to_schema(db, long_term_task)
 
-def get_settings_by_user_id(user_id: int, db: Session) -> Optional[schemas.Settings]:
-    return db.query(models.Settings).filter(models.Settings.user_id == user_id).first()
+async def get_settings_by_user_id(user_id: int, db: AsyncSession) -> Optional[schemas.Settings]:
+    result = await db.execute(select(models.Settings).filter(models.Settings.user_id == user_id))
+    return result.scalars().first()
 
-def create_settings(settings: schemas.SettingsCreate, db: Session) -> schemas.Settings:
+async def create_settings(settings: schemas.SettingsCreate, db: AsyncSession) -> schemas.Settings:
     db_settings = models.Settings(
         user_id=settings.user_id,
         primary=settings.primary,
@@ -625,15 +649,17 @@ def create_settings(settings: schemas.SettingsCreate, db: Session) -> schemas.Se
         theme_mode=settings.theme_mode
     )
     db.add(db_settings)
-    db.commit()
-    db.refresh(db_settings)
+    await db.commit()
+    await db.refresh(db_settings)
     return db_settings
 
-def get_memo(user_id: int, db: Session) -> Optional[schemas.Memo]:
-    return db.query(models.Memo).filter(models.Memo.user_id == user_id).first()
+async def get_memo(user_id: int, db: AsyncSession) -> Optional[schemas.Memo]:
+    result = await db.execute(select(models.Memo).filter(models.Memo.user_id == user_id))
+    return result.scalars().first()
 
-def update_memo(user_id: int, content: str, db: Session) -> schemas.Memo:
-    memo = db.query(models.Memo).filter(models.Memo.user_id == user_id).first()
+async def update_memo(user_id: int, content: str, db: AsyncSession) -> schemas.Memo:
+    result = await db.execute(select(models.Memo).filter(models.Memo.user_id == user_id))
+    memo = result.scalars().first()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     if memo:
@@ -647,12 +673,13 @@ def update_memo(user_id: int, content: str, db: Session) -> schemas.Memo:
         )
         db.add(memo)
     
-    db.commit()
-    db.refresh(memo)
+    await db.commit()
+    await db.refresh(memo)
     return memo
 
-def update_settings(user_id: int, settings: schemas.SettingsUpdate, db: Session) -> Optional[schemas.Settings]:
-    db_settings = db.query(models.Settings).filter(models.Settings.user_id == user_id).first()
+async def update_settings(user_id: int, settings: schemas.SettingsUpdate, db: AsyncSession) -> Optional[schemas.Settings]:
+    result = await db.execute(select(models.Settings).filter(models.Settings.user_id == user_id))
+    db_settings = result.scalars().first()
     if not db_settings:
         return None
     
@@ -660,12 +687,13 @@ def update_settings(user_id: int, settings: schemas.SettingsUpdate, db: Session)
     for key, value in update_data.items():
         setattr(db_settings, key, value)
     
-    db.commit()
-    db.refresh(db_settings)
+    await db.commit()
+    await db.refresh(db_settings)
     return db_settings
 
-def get_reminder_list(user_id: int, db: Session) -> List[dict]:
-    config = db.query(models.AIConfig).filter(models.AIConfig.user_id == user_id).first()
+async def get_reminder_list(user_id: int, db: AsyncSession) -> List[dict]:
+    result = await db.execute(select(models.AIConfig).filter(models.AIConfig.user_id == user_id))
+    config = result.scalars().first()
     if not config or not config.reminder_list:
         return []
     try:
@@ -685,8 +713,9 @@ def get_reminder_list(user_id: int, db: Session) -> List[dict]:
     normalized_items.sort(key=lambda x: _parse_reminder_time(x["time"]))
     return normalized_items
 
-def update_reminder_list(user_id: int, reminder_list: Optional[List[dict]], db: Session) -> List[dict]:
-    config = db.query(models.AIConfig).filter(models.AIConfig.user_id == user_id).first()
+async def update_reminder_list(user_id: int, reminder_list: Optional[List[dict]], db: AsyncSession) -> List[dict]:
+    result = await db.execute(select(models.AIConfig).filter(models.AIConfig.user_id == user_id))
+    config = result.scalars().first()
     normalized_items: List[dict] = []
     for item in (reminder_list or []):
         if not isinstance(item, dict):
@@ -714,17 +743,17 @@ def update_reminder_list(user_id: int, reminder_list: Optional[List[dict]], db: 
         db.add(config)
     else:
         config.reminder_list = serialized
-    db.commit()
-    db.refresh(config)
-    return get_reminder_list(user_id, db)
+    await db.commit()
+    await db.refresh(config)
+    return await get_reminder_list(user_id, db)
 
-def add_reminder(user_id: int, reminder: dict, db: Session) -> List[dict]:
+async def add_reminder(user_id: int, reminder: dict, db: AsyncSession) -> List[dict]:
     if not isinstance(reminder, dict):
         raise ValueError("reminder must be an object")
-    existing = get_reminder_list(user_id, db)
+    existing = await get_reminder_list(user_id, db)
     existing.append(_normalize_reminder_item(reminder))
     existing.sort(key=lambda x: _parse_reminder_time(x["time"]))
-    return update_reminder_list(user_id, existing, db)
+    return await update_reminder_list(user_id, existing, db)
 
 def _parse_reminder_time(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%d %H:%M")

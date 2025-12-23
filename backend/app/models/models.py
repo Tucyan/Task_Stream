@@ -4,6 +4,7 @@ from app.core.database import Base
 import datetime
 
 class User(Base):
+    """用户模型"""
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, nullable=False)
@@ -12,6 +13,7 @@ class User(Base):
     passwordHash = Column(String, nullable=False)
 
 class Task(Base):
+    """任务模型（普通任务）"""
     __tablename__ = "tasks"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -34,6 +36,7 @@ class Task(Base):
     long_term_task = relationship("LongTermTask", back_populates="tasks")
 
 class LongTermTask(Base):
+    """长期任务模型"""
     __tablename__ = "long_term_tasks"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -49,6 +52,7 @@ class LongTermTask(Base):
     tasks = relationship("Task", back_populates="long_term_task")
 
 class Journal(Base):
+    """日记模型"""
     __tablename__ = "journals"
     date = Column(String, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -58,6 +62,7 @@ class Journal(Base):
     )
 
 class AIAssistantMessage(Base):
+    """AI 助手对话记录模型"""
     __tablename__ = "ai_assistant_messages"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -66,6 +71,7 @@ class AIAssistantMessage(Base):
     messages = Column(Text, nullable=False)
 
 class AIConfig(Base):
+    """AI 配置模型"""
     __tablename__ = "ai_configs"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -84,6 +90,7 @@ class AIConfig(Base):
     reminder_list = Column(Text, nullable=True)
 
 class Settings(Base):
+    """用户界面设置模型"""
     __tablename__ = "settings"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -94,6 +101,7 @@ class Settings(Base):
     theme_mode = Column(String, default="light")
 
 class Memo(Base):
+    """备忘录模型"""
     __tablename__ = "memos"
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
     content = Column(Text, nullable=True)

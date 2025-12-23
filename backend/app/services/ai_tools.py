@@ -1,14 +1,17 @@
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete, update
 from app.services import crud, ai_config_service
 from app.services.ai_output_manager import OutputManager
 from app.schemas import schemas
 from app.models import models
 import datetime
+import json
+import time
 
-def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
+async def get_ai_tools(output_manager: OutputManager, user_id: int, db: AsyncSession):
     """
     获取AI工具列表，包含任务管理、长期任务管理、日记管理和备忘录管理工具
     
@@ -21,7 +24,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         List[StructuredTool]: AI工具列表
     """
     
-    def check_auto_confirm(action_type: str) -> bool:
+    async def check_auto_confirm(action_type: str) -> bool:
         """
         检查用户是否开启了自动确认功能
         
@@ -31,7 +34,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         返回:
             bool: 如果开启了自动确认则返回True，否则返回False
         """
-        config = ai_config_service.get_ai_config(db, user_id)
+        config = await ai_config_service.get_ai_config(db, user_id)
         if not config: return False
         if action_type == 'create':
             return bool(config.is_auto_confirm_create_request)
@@ -41,15 +44,39 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
             return bool(config.is_auto_confirm_delete_request)
         return False
     
-    def check_auto_confirm_reminder() -> bool:
-        config = ai_config_service.get_ai_config(db, user_id)
+    async def check_auto_confirm_reminder() -> bool:
+        config = await ai_config_service.get_ai_config(db, user_id)
         if not config:
             return False
         return bool(config.is_auto_confirm_create_reminder)
+    
+    def _now_ts():
+        return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    
+    def _log(layer: str, message: str, **fields):
+        payload = ""
+        if fields:
+            try:
+                payload = " " + json.dumps(fields, ensure_ascii=False, default=str)
+            except Exception:
+                payload = " " + str(fields)
+        print(f"[TS][{layer}] {_now_ts()} {message}{payload}")
+    
+    def _wrap_tool(tool_name: str, fn):
+        async def wrapped(**kwargs):
+            start = time.perf_counter()
+            _log("ai_tools.tool", "call.start", tool=tool_name, user_id=user_id, dialogue_id=getattr(output_manager, "_trace_dialogue_id", None), args=kwargs)
+            try:
+                result = await fn(**kwargs)
+                return result
+            finally:
+                cost_ms = int((time.perf_counter() - start) * 1000)
+                _log("ai_tools.tool", "call.end", tool=tool_name, cost_ms=cost_ms)
+        return wrapped
 
-    # --- Tools Definitions ---
+    # --- 工具定义 ---
 
-    # 1. Task Management
+    # 1. 任务管理
     class CreateTaskInput(BaseModel):
         title: str = Field(..., description="任务标题(必填项)")
         description: Optional[str] = Field(None, description="任务描述")
@@ -71,8 +98,11 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
                          result: str = "", result_picture_url: List[str] = None,
                          long_term_task_id: int = None):
         """创建新任务"""
-        print(f"DEBUG: Tool create_task called. Title: {title}")
         effective_assigned_date = assigned_date or datetime.datetime.now().strftime("%Y-%m-%d")
+        
+        auto_confirm = await check_auto_confirm('create')
+        _log("ai_tools.create_task", "auto_confirm", auto_confirm=auto_confirm)
+        
         card_data = {
             "type": 1,
             "data": {
@@ -90,13 +120,14 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
             }
         }
         
-        print("DEBUG: Sending card for create_task...")
-        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm('create'))
-        print(f"DEBUG: Card confirmed? {confirmed}")
+        _log("ai_tools.create_task", "card.send", need_confirm=not auto_confirm)
+        confirmed = await output_manager.send_card(card_data, need_confirm=not auto_confirm)
+        _log("ai_tools.create_task", "card.confirmed", confirmed=confirmed)
         
         if confirmed:
             try:
-                print("DEBUG: Executing CRUD create_task...")
+                crud_started = time.perf_counter()
+                _log("ai_tools.create_task", "crud.create_task.start")
                 task_in = schemas.TaskCreate(
                     user_id=user_id,
                     title=title,
@@ -112,12 +143,13 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
                     result_picture_url=result_picture_url if result_picture_url is not None else [],
                     long_term_task_id=long_term_task_id
                 )
-                new_task = crud.create_task(task_in, db)
-                print(f"DEBUG: Task created with ID: {new_task.id}")
+                new_task = await crud.create_task(task_in, db)
+                _log("ai_tools.create_task", "crud.create_task.end", cost_ms=int((time.perf_counter() - crud_started) * 1000), task_id=new_task.id)
                 return f"任务已创建，ID: {new_task.id}"
             except Exception as e:
-                print(f"DEBUG: Error creating task: {e}")
+                _log("ai_tools.create_task", "crud.create_task.error", err=str(e))
                 return f"创建任务失败: {str(e)}"
+        _log("ai_tools.create_task", "cancelled")
         return "用户取消了创建任务"
 
     class DeleteTaskInput(BaseModel):
@@ -125,12 +157,16 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
 
     async def delete_task(task_id: int):
         """删除指定ID的任务"""
-        task = crud.get_task_by_id(task_id, db)
+        task = await crud.get_task_by_id(task_id, db)
         if not task:
+            _log("ai_tools.delete_task", "task.not_found", task_id=task_id)
             return f"任务 {task_id} 不存在"
             
+        auto_confirm = await check_auto_confirm('delete')
+        _log("ai_tools.delete_task", "auto_confirm", auto_confirm=auto_confirm)
+        
         card_data = {
-            "type": 2, # Using type 2 for delete confirmation (or generic confirmation)
+            "type": 2, # 使用类型 2 进行删除确认（或通用确认）
             "data": {
                 "title": f"确认删除任务: {task.title}",
                 "description": f"ID: {task_id}",
@@ -138,13 +174,19 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
             }
         }
         
-        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm('delete'))
+        _log("ai_tools.delete_task", "card.send", need_confirm=not auto_confirm, task_id=task_id)
+        confirmed = await output_manager.send_card(card_data, need_confirm=not auto_confirm)
+        _log("ai_tools.delete_task", "card.confirmed", confirmed=confirmed, task_id=task_id)
         
         if confirmed:
-            success = crud.delete_task(task_id, db)
+            crud_started = time.perf_counter()
+            success = await crud.delete_task(task_id, db)
             if success:
+                _log("ai_tools.delete_task", "crud.delete_task.ok", cost_ms=int((time.perf_counter() - crud_started) * 1000), task_id=task_id)
                 return f"任务 {task_id} 已删除"
+            _log("ai_tools.delete_task", "crud.delete_task.failed", cost_ms=int((time.perf_counter() - crud_started) * 1000), task_id=task_id)
             return f"任务 {task_id} 删除失败"
+        _log("ai_tools.delete_task", "cancelled", task_id=task_id)
         return "用户取消了删除操作"
 
     class UpdateTaskInput(BaseModel):
@@ -167,11 +209,11 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
                          tags: List[str] = None, record_result: bool = None, result: str = None,
                          result_picture_url: List[str] = None, long_term_task_id: int = None):
         """更新任务信息"""
-        task = crud.get_task_by_id(task_id, db)
+        task = await crud.get_task_by_id(task_id, db)
         if not task:
             return f"任务 {task_id} 不存在"
         
-        # Construct update object preserving existing values if not provided
+        # 构造更新对象，如果未提供则保留现有值
         updated_data = task.dict()
         if title is not None: updated_data['title'] = title
         if description is not None: updated_data['description'] = description
@@ -186,24 +228,24 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
         if result_picture_url is not None: updated_data['result_picture_url'] = result_picture_url
         if long_term_task_id is not None: updated_data['long_term_task_id'] = long_term_task_id
         
-        # Create schema object for update
+        # 为更新创建 schema 对象
         try:
             task_update = schemas.Task(**updated_data)
         except Exception as e:
             return f"更新数据无效: {str(e)}"
 
         card_data = {
-            "type": 3, # Update confirmation
+            "type": 3, # 更新确认
             "data": {
                 "original": task.dict(),
                 "updated": updated_data
             }
         }
         
-        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm('update'))
+        confirmed = await output_manager.send_card(card_data, need_confirm=not await check_auto_confirm('update'))
         
         if confirmed:
-            success = crud.update_task(task_id, task_update, db)
+            success = await crud.update_task(task_id, task_update, db)
             if success:
                 return f"任务 {task_id} 已更新"
             return f"任务 {task_id} 更新失败"
@@ -215,7 +257,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
 
     async def get_tasks(start_date: str, end_date: str):
         """获取指定日期范围内的任务列表"""
-        tasks = crud.get_tasks_in_date_range(start_date, end_date, user_id, db)
+        tasks = await crud.get_tasks_in_date_range(start_date, end_date, user_id, db)
         if not tasks:
             return "该时间段内没有任务"
         return str([{"id": t.id, "title": t.title, "due_date": t.due_date, "status": t.status} for t in tasks])
@@ -225,7 +267,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
 
     async def get_urgent_tasks():
         """获取急需处理的任务（有截止日期且未完成）"""
-        tasks = crud.get_urgent_tasks(user_id, db)
+        tasks = await crud.get_urgent_tasks(user_id, db)
         if not tasks:
             return "没有急需处理的任务"
         return str(tasks)
@@ -252,7 +294,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
             }
         }
         
-        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm('create'))
+        confirmed = await output_manager.send_card(card_data, need_confirm=not await check_auto_confirm('create'))
         
         if confirmed:
             try:
@@ -264,7 +306,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
                     due_date=due_date,
                     sub_task_ids=sub_task_ids
                 )
-                new_lt = crud.create_long_term_task(lt_task, db)
+                new_lt = await crud.create_long_term_task(lt_task, db)
                 return f"长期任务已创建，ID: {new_lt.id}"
             except Exception as e:
                 return f"创建长期任务失败: {str(e)}"
@@ -275,7 +317,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
 
     async def delete_long_term_task(task_id: int):
         """删除长期任务"""
-        lt = crud.get_long_term_task_by_id(task_id, db)
+        lt = await crud.get_long_term_task_by_id(task_id, db)
         if not lt:
             return f"长期任务 {task_id} 不存在"
 
@@ -288,10 +330,10 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
             }
         }
         
-        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm('delete'))
+        confirmed = await output_manager.send_card(card_data, need_confirm=not await check_auto_confirm('delete'))
         
         if confirmed:
-            success = crud.delete_long_term_task(task_id, db)
+            success = await crud.delete_long_term_task(task_id, db)
             if success:
                 return f"长期任务 {task_id} 已删除"
             return "删除失败"
@@ -309,7 +351,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
                                   start_date: str = None, due_date: str = None, 
                                    sub_task_ids: dict = None):
         """更新长期任务"""
-        lt = crud.get_long_term_task_by_id(task_id, db)
+        lt = await crud.get_long_term_task_by_id(task_id, db)
         if not lt:
             return f"长期任务 {task_id} 不存在"
         
@@ -326,22 +368,23 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
             return f"更新数据无效: {str(e)}"
             
         card_data = {
-            "type": 3, 
+            "type": 3, # 更新确认
             "data": {
                 "original": lt.dict(),
                 "updated": updated_data
             }
         }
         
-        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm('update'))
+        confirmed = await output_manager.send_card(card_data, need_confirm=not await check_auto_confirm('update'))
         
         if confirmed:
             # 同步更新子任务的关联状态
             if sub_task_ids is not None:
                 try:
-                    print(f"DEBUG: Syncing subtasks for long_term_task {task_id}")
+                    _log("ai_tools.update_long_term_task", "subtasks.sync.start", task_id=task_id)
                     # 1. 获取当前已关联的子任务
-                    current_subtasks = db.query(models.Task).filter(models.Task.long_term_task_id == task_id).all()
+                    result = await db.execute(select(models.Task).filter(models.Task.long_term_task_id == task_id))
+                    current_subtasks = result.scalars().all()
                     current_ids = {t.id for t in current_subtasks}
                     
                     # 2. 获取新的子任务ID集合
@@ -356,33 +399,33 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
                     to_add = new_ids - current_ids
                     to_remove = current_ids - new_ids
                     
-                    print(f"DEBUG: Adding subtasks: {to_add}, Removing subtasks: {to_remove}")
+                    _log("ai_tools.update_long_term_task", "subtasks.sync.diff", task_id=task_id, to_add=sorted(list(to_add)), to_remove=sorted(list(to_remove)))
                     
                     # 4. 关联新任务
                     for tid in to_add:
-                        task = crud.get_task_by_id(tid, db)
+                        task = await crud.get_task_by_id(tid, db)
                         if task:
                             # 创建更新后的任务对象
                             # 注意：Pydantic v2使用 model_copy, v1使用 copy
                             updated_task_data = task.dict()
                             updated_task_data['long_term_task_id'] = task_id
                             task_update = schemas.Task(**updated_task_data)
-                            crud.update_task(tid, task_update, db)
+                            await crud.update_task(tid, task_update, db)
                             
                     # 5. 解除旧任务关联
                     for tid in to_remove:
-                        task = crud.get_task_by_id(tid, db)
+                        task = await crud.get_task_by_id(tid, db)
                         if task:
                             updated_task_data = task.dict()
                             updated_task_data['long_term_task_id'] = None
                             task_update = schemas.Task(**updated_task_data)
-                            crud.update_task(tid, task_update, db)
+                            await crud.update_task(tid, task_update, db)
                             
                 except Exception as e:
-                    print(f"ERROR syncing subtasks: {e}")
+                    _log("ai_tools.update_long_term_task", "subtasks.sync.error", task_id=task_id, err=str(e))
                     # 继续执行长期任务本身的更新，不因同步失败而完全中断
             
-            success = crud.update_long_term_task(task_id, lt_update, db)
+            success = await crud.update_long_term_task(task_id, lt_update, db)
             if success:
                 return f"长期任务 {task_id} 已更新"
             return "更新失败"
@@ -394,9 +437,9 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
     async def get_long_term_tasks(uncompleted_only: bool = False):
         """获取长期任务列表"""
         if uncompleted_only:
-            tasks = crud.get_all_uncompleted_long_term_tasks(user_id, db)
+            tasks = await crud.get_all_uncompleted_long_term_tasks(user_id, db)
         else:
-            tasks = crud.get_all_long_term_tasks(user_id, db)
+            tasks = await crud.get_all_long_term_tasks(user_id, db)
         
         if not tasks:
             return "没有找到长期任务"
@@ -410,7 +453,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
 
     async def update_journal(date: str, content: str):
         """更新指定日期的日记内容"""
-        old_journal = crud.get_journal_by_date(date, user_id, db)
+        old_journal = await crud.get_journal_by_date(date, user_id, db)
         before_content = old_journal.content if old_journal else ""
         
         card_data = {
@@ -429,10 +472,10 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
             }
         }
         
-        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm('update'))
+        confirmed = await output_manager.send_card(card_data, need_confirm=not await check_auto_confirm('update'))
         
         if confirmed:
-            crud.update_journal_content(date, content, user_id, db)
+            await crud.update_journal_content(date, content, user_id, db)
             return "日记已更新"
         return "用户取消了日记更新"
 
@@ -441,7 +484,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
 
     async def get_journal(date: str):
         """获取指定日期的日记"""
-        journal = crud.get_journal_by_date(date, user_id, db)
+        journal = await crud.get_journal_by_date(date, user_id, db)
         if journal:
             return f"日期: {journal.date}\n内容: {journal.content}"
         return "该日期没有日记"
@@ -452,7 +495,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
 
     async def get_journals_in_date_range(start_date: str, end_date: str):
         """获取指定日期范围内的所有日记"""
-        journals = crud.get_journals_in_date_range(start_date, end_date, user_id, db)
+        journals = await crud.get_journals_in_date_range(start_date, end_date, user_id, db)
         if not journals:
             return "该时间段内没有日记"
         
@@ -467,7 +510,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
 
     async def get_memo():
         """获取备忘录内容"""
-        memo = crud.get_memo(user_id, db)
+        memo = await crud.get_memo(user_id, db)
         if memo:
             return f"备忘录内容: {memo.content}"
         return "备忘录为空"
@@ -484,11 +527,11 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
             reminder["task_id"] = task_id
 
         card_data = {"type": 8, "data": reminder}
-        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm_reminder())
+        confirmed = await output_manager.send_card(card_data, need_confirm=not await check_auto_confirm_reminder())
         if not confirmed:
             return "用户取消了提醒创建"
         try:
-            new_list = crud.add_reminder(user_id, reminder, db)
+            new_list = await crud.add_reminder(user_id, reminder, db)
             return f"提醒已添加，共 {len(new_list)} 条"
         except Exception as e:
             return f"添加提醒失败: {str(e)}"
@@ -498,7 +541,7 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
 
     async def get_reminder_list():
         import json
-        reminders = crud.get_reminder_list(user_id, db)
+        reminders = await crud.get_reminder_list(user_id, db)
         return json.dumps(reminders, ensure_ascii=False)
 
     class UpdateReminderListInput(BaseModel):
@@ -506,35 +549,35 @@ def get_ai_tools(output_manager: OutputManager, user_id: int, db: Session):
 
     async def update_reminder_list(reminder_list: List[Dict[str, Any]]):
         card_data = {"type": 9, "data": {"reminder_list": reminder_list}}
-        confirmed = await output_manager.send_card(card_data, need_confirm=not check_auto_confirm('update'))
+        confirmed = await output_manager.send_card(card_data, need_confirm=not await check_auto_confirm('update'))
         if not confirmed:
             return "用户取消了提醒列表更新"
         try:
-            new_list = crud.update_reminder_list(user_id, reminder_list, db)
+            new_list = await crud.update_reminder_list(user_id, reminder_list, db)
             return f"提醒列表已更新，共 {len(new_list)} 条"
         except Exception as e:
             return f"更新提醒列表失败: {str(e)}"
 
     tools: List[StructuredTool] = [
-        StructuredTool.from_function(coroutine=create_task, name="create_task", description="创建新任务", args_schema=CreateTaskInput),
-        StructuredTool.from_function(coroutine=delete_task, name="delete_task", description="删除任务", args_schema=DeleteTaskInput),
-        StructuredTool.from_function(coroutine=update_task, name="update_task", description="更新任务信息", args_schema=UpdateTaskInput),
-        StructuredTool.from_function(coroutine=get_tasks, name="get_tasks", description="获取任务列表", args_schema=GetTasksInput),
-        StructuredTool.from_function(coroutine=get_urgent_tasks, name="get_urgent_tasks", description="获取急需处理的任务", args_schema=GetUrgentTasksInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("create_task", create_task), name="create_task", description="创建新任务", args_schema=CreateTaskInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("delete_task", delete_task), name="delete_task", description="删除任务", args_schema=DeleteTaskInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("update_task", update_task), name="update_task", description="更新任务信息", args_schema=UpdateTaskInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("get_tasks", get_tasks), name="get_tasks", description="获取任务列表", args_schema=GetTasksInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("get_urgent_tasks", get_urgent_tasks), name="get_urgent_tasks", description="获取急需处理的任务", args_schema=GetUrgentTasksInput),
         
-        StructuredTool.from_function(coroutine=create_long_term_task, name="create_long_term_task", description="创建长期任务", args_schema=CreateLongTermTaskInput),
-        StructuredTool.from_function(coroutine=delete_long_term_task, name="delete_long_term_task", description="删除长期任务", args_schema=DeleteLongTermTaskInput),
-        StructuredTool.from_function(coroutine=update_long_term_task, name="update_long_term_task", description="更新长期任务", args_schema=UpdateLongTermTaskInput),
-        StructuredTool.from_function(coroutine=get_long_term_tasks, name="get_long_term_tasks", description="获取长期任务列表", args_schema=GetLongTermTasksInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("create_long_term_task", create_long_term_task), name="create_long_term_task", description="创建长期任务", args_schema=CreateLongTermTaskInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("delete_long_term_task", delete_long_term_task), name="delete_long_term_task", description="删除长期任务", args_schema=DeleteLongTermTaskInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("update_long_term_task", update_long_term_task), name="update_long_term_task", description="更新长期任务", args_schema=UpdateLongTermTaskInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("get_long_term_tasks", get_long_term_tasks), name="get_long_term_tasks", description="获取长期任务列表", args_schema=GetLongTermTasksInput),
         
-        StructuredTool.from_function(coroutine=update_journal, name="update_journal", description="更新日记", args_schema=UpdateJournalInput),
-        StructuredTool.from_function(coroutine=get_journal, name="get_journal", description="获取指定日期的日记", args_schema=GetJournalInput),
-        StructuredTool.from_function(coroutine=get_journals_in_date_range, name="get_journals_in_date_range", description="获取指定日期范围内的日记", args_schema=GetJournalsInDateRangeInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("update_journal", update_journal), name="update_journal", description="更新日记", args_schema=UpdateJournalInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("get_journal", get_journal), name="get_journal", description="获取指定日期的日记", args_schema=GetJournalInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("get_journals_in_date_range", get_journals_in_date_range), name="get_journals_in_date_range", description="获取指定日期范围内的日记", args_schema=GetJournalsInDateRangeInput),
         
-        StructuredTool.from_function(coroutine=get_memo, name="get_memo", description="获取备忘录内容", args_schema=GetMemoInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("get_memo", get_memo), name="get_memo", description="获取备忘录内容", args_schema=GetMemoInput),
         
-        StructuredTool.from_function(coroutine=add_reminder, name="add_reminder", description="新增一条提醒", args_schema=AddReminderInput),
-        StructuredTool.from_function(coroutine=get_reminder_list, name="get_reminder_list", description="获取提醒列表(按time升序)", args_schema=GetReminderListInput),
-        StructuredTool.from_function(coroutine=update_reminder_list, name="update_reminder_list", description="更新提醒列表(强校验+自动排序)", args_schema=UpdateReminderListInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("add_reminder", add_reminder), name="add_reminder", description="新增一条提醒", args_schema=AddReminderInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("get_reminder_list", get_reminder_list), name="get_reminder_list", description="获取提醒列表(按time升序)", args_schema=GetReminderListInput),
+        StructuredTool.from_function(coroutine=_wrap_tool("update_reminder_list", update_reminder_list), name="update_reminder_list", description="更新提醒列表(强校验+自动排序)", args_schema=UpdateReminderListInput),
     ]
     return tools
