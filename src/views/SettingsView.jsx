@@ -59,7 +59,7 @@ export default function SettingsView({ isDarkMode, toggleDarkMode, settings, set
   const handleColorChange = (key, value) => {
     const newSettings = { ...settings, [key]: value }
     setSettings(newSettings)
-    // Debouncing could be added here, but for now let's rely on onBlur or just saving on discrete actions
+    // 这里可以添加防抖处理，但目前先依赖 onBlur 或特定动作保存
   }
 
   const handleColorBlur = () => {

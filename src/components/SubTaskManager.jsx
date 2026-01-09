@@ -6,9 +6,9 @@ export default function SubtaskManager({ visible, onClose, onSave, currentUserId
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTaskIds, setSelectedTaskIds] = useState({})
-  const [mode, setMode] = useState('select') // 'select' or 'create'
+  const [mode, setMode] = useState('select') // 'select' (选择) 或 'create' (创建)
   
-  // New Task State
+  // 新任务状态
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDescription, setNewTaskDescription] = useState('')
   const [newTaskDate, setNewTaskDate] = useState('')
@@ -24,7 +24,7 @@ export default function SubtaskManager({ visible, onClose, onSave, currentUserId
   useEffect(() => {
     if (visible && currentUserId) {
       fetchTasks()
-      // Initialize date to today
+      // 初始化日期为今天
       setNewTaskDate(new Date().toISOString().split('T')[0])
       setNewTaskStartTime('09:00')
       setNewTaskEndTime('10:00')
@@ -257,7 +257,7 @@ export default function SubtaskManager({ visible, onClose, onSave, currentUserId
           ) : (
             <div className="space-y-6">
               
-              {/* Title Section */}
+              {/* 标题区域 */}
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">任务标题 <span className="text-red-500">*</span></label>
                 <input 
@@ -269,7 +269,7 @@ export default function SubtaskManager({ visible, onClose, onSave, currentUserId
                 />
               </div>
 
-              {/* Time & Date Row */}
+              {/* 时间和日期行 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">执行日期</label>
@@ -300,7 +300,7 @@ export default function SubtaskManager({ visible, onClose, onSave, currentUserId
                 </div>
               </div>
 
-              {/* Tags Section */}
+              {/* 标签区域 */}
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">标签</label>
               <div className="relative">
@@ -315,7 +315,7 @@ export default function SubtaskManager({ visible, onClose, onSave, currentUserId
                 </div>
               </div>
               
-              {/* Record Result, Deadline, Weight Row */}
+              {/* 记录成果、截止日期和权重行 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">记录成果</label>
@@ -339,7 +339,7 @@ export default function SubtaskManager({ visible, onClose, onSave, currentUserId
                 </div>
               </div>
 
-              {/* Weight Section */}
+              {/* 权重区域 */}
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">任务权重</label>
                 <div className="flex items-center gap-4">
@@ -358,7 +358,7 @@ export default function SubtaskManager({ visible, onClose, onSave, currentUserId
                 </div>
               </div>
 
-              {/* Description Section */}
+              {/* 描述区域 */}
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">任务描述</label>
                 <textarea 

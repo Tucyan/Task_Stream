@@ -53,7 +53,7 @@ async function request(url, options = {}) {
         }
     } else {
         if (import.meta.env.DEV) {
-            console.log('API Request:', url, options);
+            console.log('API 请求:', url, options);
         }
     }
     
@@ -71,32 +71,32 @@ async function request(url, options = {}) {
         }
     } else {
         if (import.meta.env.DEV) {
-            console.log('API Response:', response.status, response.statusText);
+            console.log('API 响应:', response.status, response.statusText);
         }
     }
 
     if (!response.ok) {
         // 尝试获取详细的错误信息
-        let errorMessage = `API Error: ${response.statusText}`;
+        let errorMessage = `API 错误: ${response.statusText}`;
         try {
             const errorData = await response.json();
             if (isNicknameUpdate) {
                 console.error('[API错误] 昵称更新错误详情:', errorData);
             } else {
-                console.error('Error Details:', errorData);
+                console.error('错误详情:', errorData);
             }
             if (errorData.detail) {
                 // 如果detail是数组，格式化每个错误
                 if (Array.isArray(errorData.detail)) {
-                    errorMessage = 'Validation errors:\n' + errorData.detail.map(err => {
+                    errorMessage = '校验错误:\n' + errorData.detail.map(err => {
                         return `- ${err.loc ? err.loc.join('.') + ': ' : ''}${err.msg}`;
                     }).join('\n');
                 } else {
-                    errorMessage = `API Error: ${errorData.detail}`;
+                    errorMessage = `API 错误: ${errorData.detail}`;
                 }
             }
         } catch (e) {
-            console.error('Could not parse error response:', e);
+            console.error('无法解析错误响应:', e);
         }
         throw new Error(errorMessage);
     }
@@ -219,7 +219,7 @@ export async function createLongTermTask(taskData) {
     });
 }
 
-// --- AI API ---
+// --- 智能助手 (AI) 接口 ---
 
 /**
  * 获取用户 AI 配置
@@ -418,7 +418,7 @@ export async function getHeatmapData(year, month, userId) {
  * @returns {Promise<object>} - 注册结果
  */
 export async function register(username, password) {
-    // 注册时前端需传递 passwordHash 字段
+    // 注册时前端需传递密码哈希 (passwordHash) 字段
     const passwordHash = await hashPassword(password);
     return request('/api/v1/auth/register', {
         method: 'POST',
@@ -439,7 +439,7 @@ async function hashPassword(password) {
  * @returns {Promise<object>} - 登录结果
  */
 export async function login(username, password) {
-    // 登录时前端需传递 passwordHash 字段
+    // 登录时前端需传递密码哈希 (passwordHash) 字段
     const passwordHash = await hashPassword(password);
     return request('/api/v1/auth/login', {
         method: 'POST',
@@ -455,7 +455,7 @@ export async function login(username, password) {
  * @returns {Promise<object>} - 注册结果
  */
 export async function registerWithNickname(username, password, nickname) {
-    // 注册时前端需传递 passwordHash 字段
+    // 注册时前端需传递密码哈希 (passwordHash) 字段
     const passwordHash = await hashPassword(password);
     return request('/api/v1/auth/register', {
         method: 'POST',

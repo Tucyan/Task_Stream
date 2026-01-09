@@ -19,11 +19,11 @@ export default function DetailView({
 }) {
   return (
     <div className="h-full min-h-0 flex flex-col gap-4 md:gap-6 max-w-7xl mx-auto w-full">
-      {/* Desktop Header - Hidden on mobile, shown on larger screens */}
+      {/* 桌面端头部 - 移动端隐藏，大屏显示 */}
       <div className="hidden sm:flex sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-bold dark:text-white">每日任务</h2>
         <div className="flex items-center gap-3">
-          {/* Search - Desktop */}
+          {/* 搜索 - 桌面端 */}
           <div className="relative group flex-none">
             <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors"></i>
             <input 
@@ -41,7 +41,7 @@ export default function DetailView({
         </div>
       </div>
 
-      {/* Mobile Search Bar - Shows on mobile with integrated add button */}
+      {/* 移动端搜索栏 - 在移动端显示，集成添加按钮 */}
       <div className="sm:hidden flex items-center gap-2">
         <div className="relative group flex-1">
           <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors"></i>
@@ -58,9 +58,9 @@ export default function DetailView({
         </button>
       </div>
 
-      {/* Filter Section */}
+      {/* 筛选区域 */}
       <div className="bg-card rounded-xl md:rounded-2xl p-3 md:p-4 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row gap-3">
-        {/* Date Filter - Left-aligned in wide screens */}
+        {/* 日期筛选 - 在宽屏中左对齐 */}
         <div className="flex items-center gap-2 bg-gray-50 dark:bg-black/20 p-2 rounded-lg border border-gray-200 dark:border-gray-700 w-full sm:w-96 sm:mr-auto">
           <i className="fa-regular fa-calendar text-gray-400 dark:text-gray-300 ml-2 shrink-0"></i>
           <input 
@@ -84,7 +84,7 @@ export default function DetailView({
           </button>
         </div>
         
-        {/* Status Filter - Right-aligned in wide screens */}
+        {/* 状态筛选 - 在宽屏中右对齐 */}
         <div className="flex bg-gray-100 dark:bg-black/20 p-1 rounded-lg w-full sm:w-80 sm:ml-auto">
           <button 
             onClick={() => setDetailFilter('all')} 

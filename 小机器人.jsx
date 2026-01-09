@@ -76,7 +76,6 @@ const RobotFace = ({
   const stateRef = useRef({
     width: 0, height: 0,
     mouse: { x: 0, y: 0 }, targetMouse: { x: 0, y: 0 },
-    // isMouseDown: false, // 移除鼠标点击状态
     currentVal: JSON.parse(JSON.stringify(DEFAULT_EXPRESSIONS.neutral)),
     targetVal: DEFAULT_EXPRESSIONS.neutral,
     currentLogicState: 'neutral',
@@ -91,7 +90,7 @@ const RobotFace = ({
     winkStartTime: 0
   });
 
-  // 1. 监听 Wink 触发
+  // 1. 监听眨眼触发
   useEffect(() => {
     if (winkTrigger > 0) {
       const state = stateRef.current;
@@ -106,7 +105,7 @@ const RobotFace = ({
     state.currentLogicState = expression;
 
     // 直接设置目标值，不再使用 setTimeout 回到 neutral
-    // lerp 插值函数会自动处理两个状态之间的平滑过渡
+    // 线性插值 (lerp) 函数会自动处理两个状态之间的平滑过渡
     state.targetVal = expressionsData[expression] || expressionsData.neutral;
 
   }, [expression, expressionsData]);
@@ -130,16 +129,16 @@ const RobotFace = ({
     const draw = () => {
       state.time += 0.05;
 
-      // --- 处理 Wink 动作动画 ---
+      // --- 处理眨眼动作动画 ---
       if (state.isWinkingAction) {
         const elapsed = Date.now() - state.winkStartTime;
-        const duration = 800; 
+        const duration = 800; // 动画持续时间
         if (elapsed < duration) {
             const progress = elapsed / duration;
             if (progress < 0.5) {
-                state.actionWinkVal = progress * 2; 
+                state.actionWinkVal = progress * 2; // 闭眼阶段
             } else {
-                state.actionWinkVal = 1 - (progress - 0.5) * 2; 
+                state.actionWinkVal = 1 - (progress - 0.5) * 2; // 开眼阶段
             }
         } else {
             state.actionWinkVal = 0;
@@ -233,7 +232,7 @@ const RobotFace = ({
       
       ctx.beginPath();
       
-      if (s.currentVal.eyeShape === 5) { // Starry (十字星星眼)
+      if (s.currentVal.eyeShape === 5) { // 十字星星眼
         const r = size * 0.9; 
         ctx.moveTo(0, -r); 
         ctx.quadraticCurveTo(0, 0, r, 0); 
@@ -242,7 +241,7 @@ const RobotFace = ({
         ctx.quadraticCurveTo(0, 0, 0, -r); 
         ctx.fill();
       }
-      else if (s.currentVal.eyeShape === 4) { // Sleeping (Line)
+      else if (s.currentVal.eyeShape === 4) { // 睡眠
         ctx.lineWidth = 12;
         const lineLen = size * 0.8;
         ctx.moveTo(-lineLen, 0);
@@ -250,19 +249,19 @@ const RobotFace = ({
         ctx.stroke();
         ctx.lineWidth = 6;
       }
-      else if (isWinking && winkValue > 0.8) { // Wink (<)
+      else if (isWinking && winkValue > 0.8) { // 眨眼
         const ws = size * 0.8; 
         ctx.moveTo(ws, -ws);
         ctx.lineTo(-ws, 0);
         ctx.lineTo(ws, ws);
         ctx.stroke();
       } 
-      else if (s.currentVal.eyeShape === 3) { // Heart
-        const hs = size * 0.035; 
+      else if (s.currentVal.eyeShape === 3) { // 爱心
+        const hs = size * 0.035; // 心形缩放系数
         ctx.save(); 
         ctx.scale(hs, hs); 
         ctx.beginPath();
-        const bottomY = 25; 
+        const bottomY = 25; // 心形底部坐标
         ctx.moveTo(0, -10);
         ctx.bezierCurveTo(0, -25, -25, -25, -25, -10);
         ctx.bezierCurveTo(-25, 10, 0, 15, 0, bottomY);
@@ -271,17 +270,17 @@ const RobotFace = ({
         ctx.fill(); 
         ctx.restore();
       } 
-      else if (s.currentVal.eyeShape === 1) { // Arc
+      else if (s.currentVal.eyeShape === 1) { // 弧形
         ctx.arc(0, 15, size, Math.PI, 0);
         ctx.stroke();
       } 
-      else if (s.currentVal.eyeShape === 2) { // Lines (> <)
-        const sz = size * 0.8;
+      else if (s.currentVal.eyeShape === 2) { // 线条
+        const sz = size * 0.8; // 线条尺寸
         if (isLeft) { ctx.moveTo(-sz, -sz); ctx.lineTo(sz, 0); ctx.lineTo(-sz, sz); }
         else { ctx.moveTo(sz, -sz); ctx.lineTo(-sz, 0); ctx.lineTo(sz, sz); }
         ctx.stroke();
       } 
-      else { // Circle (Default)
+      else { // 圆形 (默认)
         ctx.arc(0, 0, size, 0, Math.PI * 2);
         ctx.stroke();
       }
@@ -318,7 +317,7 @@ const RobotFace = ({
       const y = s.currentVal.mouthY;
       ctx.save(); ctx.translate(0, y); ctx.beginPath();
       
-      if (s.currentVal.mouthShape === 6) { // Pouting
+      if (s.currentVal.mouthShape === 6) { // 嘟嘴
         ctx.moveTo(-w, 0);
         ctx.quadraticCurveTo(0, h, w, 0); 
         
@@ -328,20 +327,20 @@ const RobotFace = ({
         ctx.moveTo(w + sideGap, -sideH);
         ctx.quadraticCurveTo(w - sideGap, 0, w + sideGap, sideH);
 
-      } else if (s.currentVal.mouthShape === 5) { // 'w' shape
-        const halfW = w / 2;
+      } else if (s.currentVal.mouthShape === 1) { // D 形嘴 (D-shape mouth)
+        const halfW = w / 2; // 一半宽度
         ctx.moveTo(-w, -h/2);
         ctx.quadraticCurveTo(-halfW, h, 0, -h/2);
         ctx.quadraticCurveTo(halfW, h, w, -h/2);
-      } else if (s.currentVal.mouthShape === 4) { // Sad arc
+      } else if (s.currentVal.mouthShape === 4) { // 悲伤弧形
         ctx.moveTo(-w, h); ctx.quadraticCurveTo(0, -h, w, h);
-      } else if (s.currentVal.mouthShape === 3) { // Trapezoid
+      } else if (s.currentVal.mouthShape === 3) { // 梯形
         ctx.moveTo(-w, h); ctx.lineTo(-w/2, -h/2); ctx.lineTo(0, h); ctx.lineTo(w/2, -h/2); ctx.lineTo(w, h);
-      } else if (s.currentVal.mouthShape === 2) { // Circle (O)
+      } else if (s.currentVal.mouthShape === 2) { // 圆形
         ctx.ellipse(0, h/2, w/2, h, 0, 0, Math.PI * 2);
-      } else if (s.currentVal.mouthShape === 1) { // D shape
+      } else if (s.currentVal.mouthShape === 1) { // D 形嘴 (D-shape mouth)
         ctx.moveTo(-w, 0); ctx.quadraticCurveTo(0, h*2, w, 0); ctx.quadraticCurveTo(0, h*0.5, -w, 0);
-      } else { // Neutral arc
+      } else { // 中性弧形
         ctx.moveTo(-w, 0); ctx.quadraticCurveTo(0, h, w, 0);
       }
       ctx.stroke(); ctx.restore();
@@ -404,12 +403,12 @@ const RobotFace = ({
                 y: -60, 
                 size: 20,
                 alpha: 1,
-                drift: Math.random() * 0.5
+                drift: Math.random() * 0.5 // 漂移
             });
         }
         for (let i = s.zzzs.length - 1; i >= 0; i--) {
             let z = s.zzzs[i];
-            z.y -= 1; 
+            z.y -= 1; // 向上移动
             z.x += z.drift; 
             z.size += 0.2; 
             z.alpha -= 0.01; 
@@ -492,12 +491,12 @@ const RobotFace = ({
   );
 };
 
-// --- App ---
+// --- 应用程序 ---
 
 const App = () => {
   const [currentExpr, setCurrentExpr] = useState('neutral');
   const [themeColor, setThemeColor] = useState('#0ff');
-  const [winkCounter, setWinkCounter] = useState(0); // 触发器
+  const [winkCounter, setWinkCounter] = useState(0); // 眨眼触发器
 
   const handleWink = () => {
     setWinkCounter(c => c + 1);
@@ -517,9 +516,9 @@ const App = () => {
       tearAlpha: 0, wink: 0
     },
     starry: {
-      eyeScaleY: 1, eyeShape: 5, pupilScale: 0, // 5 = Cross Star
+      eyeScaleY: 1, eyeShape: 5, pupilScale: 0, // 5 = 十字星
       browAngle: 0, browY: -80, browAlpha: 0, 
-      mouthWidth: 50, mouthHeight: 50, mouthY: 90, mouthShape: 2, // O型嘴
+      mouthWidth: 50, mouthHeight: 50, mouthY: 90, mouthShape: 2, // O 形嘴 (O-shape mouth)
       tearAlpha: 0, wink: 0
     },
     sweat: {
@@ -604,7 +603,7 @@ const App = () => {
 
       <div className="bg-neutral-800 p-6 rounded-xl border border-neutral-700 w-full max-w-2xl">
         <div className="flex items-center justify-center gap-4 mb-6">
-          <span className="text-sm text-gray-400">THEME COLOR:</span>
+          <span className="text-sm text-gray-400">主题颜色:</span>
           <div className="flex gap-3">
             {['#0ff', '#0f0', '#ffaa00', '#ff0055', '#a855f7'].map(c => (
               <button
@@ -659,7 +658,7 @@ const App = () => {
             onClick={handleWink}
             className="px-6 py-2 rounded-full border border-cyan-500 text-cyan-400 hover:bg-cyan-900/30 font-bold tracking-widest transition-transform active:scale-95 shadow-[0_0_10px_rgba(0,255,255,0.3)]"
           >
-            DO WINK 😉
+            点击眨眼 😉
           </button>
         </div>
       </div>

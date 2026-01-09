@@ -145,6 +145,7 @@ async def create_dialogue(db: AsyncSession, user_id: int, title: str = None):
     db.add(new_dialogue)
     await db.commit()
     await db.refresh(new_dialogue)
+    new_id = new_dialogue.id
     
     # 更新 AIConfig
     result = await db.execute(select(models.AIConfig).filter(models.AIConfig.user_id == user_id))
@@ -154,7 +155,7 @@ async def create_dialogue(db: AsyncSession, user_id: int, title: str = None):
             id_list = json.loads(config.ai_dialogue_id_list) if config.ai_dialogue_id_list else []
         except:
             id_list = []
-        id_list.append(new_dialogue.id)
+        id_list.append(new_id)
         config.ai_dialogue_id_list = json.dumps(id_list)
         await db.commit()
     else:
@@ -162,7 +163,7 @@ async def create_dialogue(db: AsyncSession, user_id: int, title: str = None):
         # 最好是先创建默认配置。但这里为了鲁棒性，先不处理。
         pass
         
-    return await get_dialogue(db, new_dialogue.id, user_id)
+    return await get_dialogue(db, new_id, user_id)
 
 async def delete_dialogue(db: AsyncSession, dialogue_id: int, user_id: int):
     """删除指定对话"""

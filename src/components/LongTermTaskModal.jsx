@@ -19,7 +19,7 @@ export default function LongTermTaskModal({ visible, onClose, onSave, task }) {
       const now = new Date();
       const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
       setStartDate(today)
-      // Default to 1 month later
+      // 默认为 1 个月后
       const nextMonth = new Date()
       nextMonth.setMonth(nextMonth.getMonth() + 1)
       setDueDate(nextMonth.toISOString().slice(0, 16))
@@ -32,7 +32,7 @@ export default function LongTermTaskModal({ visible, onClose, onSave, task }) {
     if (!title) return alert('请输入目标标题')
     
     const taskData = {
-      // If editing, preserve other fields first
+      // 如果是编辑，先保留其他字段
       ...(task || {}),
       title,
       description,

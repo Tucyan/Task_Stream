@@ -43,17 +43,18 @@ export default function HomeView(props) {
     const calculatePageSize = () => {
       if (!containerRef.current) return
       const height = containerRef.current.clientHeight
-      const padding = 48 // p-6 (24px) * 2
-      const gap = 16     // gap-4 (16px)
+      const padding = 48 // p-6 (24px) * 2 内边距
+      const gap = 16     // 间距 (gap-4, 16px)
       const minCardHeight = 100 // 最小卡片高度
       
       const availableHeight = height - padding
-      // Calculation: n * minH + (n-1) * gap <= availableH
-      // => n * (minH + gap) - gap <= availableH
-      // => n * (minH + gap) <= availableH + gap
-      // => n <= (availableH + gap) / (minH + gap)
+      // 计算逻辑: n * 最小高度 + (n-1) * 间距 <= 可用高度
+      // => n * (最小高度 + 间距) - 间距 <= 可用高度
+      // => n * (最小高度 + 间距) <= 可用高度 + 间距
+      // => n <= (可用高度 + 间距) / (最小高度 + 间距)
       
       const n = Math.floor((availableHeight + gap) / (minCardHeight + gap))
+      // 确保最小页大小为1
       setPageSize(Math.max(1, n))
     }
 
@@ -132,7 +133,7 @@ export default function HomeView(props) {
     const newContent = e.target.value
     setMemoContent(newContent)
     
-    // Debounce save
+    // 防抖保存
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(() => {
         if (userId) {
@@ -146,8 +147,8 @@ export default function HomeView(props) {
     }, 1000)
   }
 
-  // Mobile View Swipe Logic
-  const [mobileView, setMobileView] = useState(0) // 0: Welcome+Today, 1: Memo+Urgent
+  // 移动端视图滑动逻辑
+  const [mobileView, setMobileView] = useState(0) // 0: 欢迎+今日任务, 1: 备忘+紧急任务
   const touchStartRef = useRef(null)
   
   const handleTouchStart = (e) => {
@@ -160,13 +161,13 @@ export default function HomeView(props) {
     const touchEnd = e.changedTouches[0].clientX
     const diff = touchStartRef.current - touchEnd
     
-    // Threshold for swipe (e.g., 50px)
+    // 滑动阈值（例如 50px）
     if (Math.abs(diff) > 50) {
       if (diff > 0) {
-        // Swiped Left -> Next View
+        // 向左滑动 -> 下一个视图
         setMobileView(prev => Math.min(1, prev + 1))
       } else {
-        // Swiped Right -> Prev View
+        // 向右滑动 -> 上一个视图
         setMobileView(prev => Math.max(0, prev - 1))
       }
     }
@@ -180,15 +181,15 @@ export default function HomeView(props) {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Column 1: Welcome + Today Tasks */}
+      {/* 第一列：欢迎 + 今日任务 */}
       <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${mobileView === 0 ? 'block' : 'hidden md:flex'} h-full overflow-y-auto md:overflow-visible pb-4 md:pb-0`}>
-        {/* Welcome Card */}
+        {/* 欢迎卡片 */}
         <div className="bg-gradient-to-r from-primary to-purple-400 rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden group min-h-[140px] md:h-32 shrink-0 flex items-center">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
           <h2 className="text-xl md:text-2xl font-bold leading-relaxed">{getWelcomeText()}</h2>
         </div>
         
-        {/* Today Tasks */}
+        {/* 今日任务 */}
         <div className="flex-1 bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col min-h-[400px] md:min-h-0">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-bold dark:text-white">今日日程</h3>
@@ -220,9 +221,9 @@ export default function HomeView(props) {
         </div>
       </div>
 
-      {/* Column 2: Memo + Urgent Tasks */}
+      {/* 第二列：备忘 + 紧急任务 */}
       <div className={`w-full md:w-96 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${mobileView === 1 ? 'block' : 'hidden md:flex'} h-full overflow-y-auto md:overflow-visible pb-4 md:pb-0`}>
-        {/* Memo Card */}
+        {/* 备忘卡片 */}
         <div className="bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col relative min-h-[160px] md:h-40 shrink-0">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-bold text-gray-500 dark:text-gray-400 text-sm">近期目标 (Memo)</h3>
@@ -230,14 +231,14 @@ export default function HomeView(props) {
           </div>
           <textarea 
             className="w-full flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed dark:text-white" 
-            placeholder="在这里写下你的近期小目标..." 
+            placeholder="在这里 write 下你的近期小目标..." 
             value={memoContent}
             onChange={handleMemoChange}
           />
           <div className="absolute bottom-4 right-6 text-xs text-gray-400 dark:text-gray-500">{memoDate || '今天'}</div>
         </div>
 
-        {/* Urgent Tasks */}
+        {/* 紧急任务 */}
         <div ref={containerRef} className="flex-1 bg-card rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col relative group justify-center min-h-[200px] md:min-h-0">
           {/* 左切换按钮 */}
           <button  
@@ -297,7 +298,7 @@ export default function HomeView(props) {
         </div>
       </div>
 
-      {/* Mobile View Indicators */}
+      {/* 移动端视图指示器 */}
       <div className="md:hidden absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-2 z-10">
         <div className={`w-2 h-2 rounded-full transition-colors ${mobileView === 0 ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
         <div className={`w-2 h-2 rounded-full transition-colors ${mobileView === 1 ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></div>

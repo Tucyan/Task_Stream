@@ -6,18 +6,18 @@ import remarkGfm from 'remark-gfm';
 
 export default function AiAssistantView() {
     const [userId, setUserId] = useState(1);
-    // Default to closed on mobile (< 768px), open on desktop
+    // 移动端 (< 768px) 默认关闭，桌面端默认打开
     const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
     const [settingsOpen, setSettingsOpen] = useState(false);
     
-    // Data States
+    // 数据状态
     const [dialogues, setDialogues] = useState([]);
     const [currentDialogueId, setCurrentDialogueId] = useState(null);
-    const [messages, setMessages] = useState([]); // [{role, content: string | array, ...}]
+    const [messages, setMessages] = useState([]); // [{角色, 内容: 字符串 | 数组, ...}]
     const [inputValue, setInputValue] = useState("");
     const [isStreaming, setIsStreaming] = useState(false);
     
-    // Config State
+    // 配置状态
     const [aiConfig, setAiConfig] = useState({
         api_key: '',
         model: 'qwen-flash',
@@ -32,10 +32,10 @@ export default function AiAssistantView() {
         is_auto_confirm_create_reminder: 0
     });
 
-    // Refs
+    // 引用
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
-    const touchStartRef = useRef(null); // For swipe detection
+    const touchStartRef = useRef(null); // 用于滑动检测
     const userIdRef = useRef(1);
     const messagesRef = useRef([]);
     const currentDialogueIdRef = useRef(null);
@@ -220,7 +220,7 @@ export default function AiAssistantView() {
         localStorage.setItem(key, String(did));
     };
 
-    // Initialize
+    // 初始化
     useEffect(() => {
         let isActive = true;
         const run = async () => {
@@ -266,7 +266,7 @@ export default function AiAssistantView() {
         };
     }, []);
 
-    // Scroll to bottom on new messages
+    // 新消息自动滚动到底部
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
@@ -299,26 +299,26 @@ export default function AiAssistantView() {
     const loadConfig = async (uid) => {
         try {
             const res = await api.getAiConfig(uid);
-            // Ensure numeric fields are numbers (API might return them, but just in case)
+            // 确保数值字段是数字 (API 可能会返回它们，但以防万一)
             setAiConfig(prev => ({
                 ...prev,
                 ...res,
                 openai_base_url: res?.openai_base_url ?? prev.openai_base_url ?? ''
             }));
         } catch (e) {
-            console.error("Failed to load AI config", e);
+            console.error("加载 AI 配置失败", e);
         }
     };
 
     const loadDialogues = async (uid) => {
         try {
             const res = await api.getDialogues(uid);
-            // Sort by id desc (newest first)
+            // 按 ID 降序排序（最新优先）
             const sorted = res.sort((a, b) => b.id - a.id);
             setDialogues(sorted);
             return sorted;
         } catch (e) {
-            console.error("Failed to load dialogues", e);
+            console.error("加载对话列表失败", e);
             return [];
         }
     };
@@ -341,10 +341,10 @@ export default function AiAssistantView() {
         const uid = uidOverride ?? userIdRef.current ?? userId;
         if (currentDialogueId === did) return;
         setCurrentDialogueId(did);
-        setMessages([]); // Clear current view
+        setMessages([]); // 清空当前视图
         setLastDialogueId(uid, did);
 
-        if (!did) return; // "New Chat" selected
+        if (!did) return; // 选中了“新对话”
 
         let cachedReconciled = null;
         try {
@@ -361,9 +361,8 @@ export default function AiAssistantView() {
 
         try {
             const res = await api.getDialogue(did, uid);
-            // Parse messages
-            // Backend returns: { messages: [ [userMsg, aiMsg], ... ] } or similar structure?
-            // ai_test.html says: data.messages.forEach(turn => { if(isArray(turn)) turn.forEach(...) })
+            // 解析消息
+            // 后端返回：{ messages: [ [userMsg, aiMsg], ... ] } 或类似结构？
             
             const parsedMessages = [];
             if (res.messages && Array.isArray(res.messages)) {
@@ -373,14 +372,14 @@ export default function AiAssistantView() {
                             if (msg) {
                                 let content = msg.content;
                                 
-                                // Transform backend mixed content to frontend format
+                                // 将后端混合内容转换为前端格式
                                 if (Array.isArray(content)) {
                                     content = content.map(item => {
-                                        // Backend text type is 0
+                                        // 后端文本类型为 0
                                         if (item.type === 0) {
                                             return { type: 'text', text: item.data?.content || '' };
                                         } else {
-                                            // Backend card types are > 0
+                                            // 后端卡片类型 > 0
                                             return { type: 'card', data: item };
                                         }
                                     });
@@ -412,7 +411,7 @@ export default function AiAssistantView() {
                 flushMessagesCache(uid, did, backendReconciled);
             }
         } catch (e) {
-            console.error("Failed to load dialogue history", e);
+            console.error("加载对话历史失败", e);
         }
     };
 
@@ -442,7 +441,7 @@ export default function AiAssistantView() {
         
         let targetDialogueId = currentDialogueId;
         
-        // Auto-create dialogue if new
+        // 如果是新对话，则自动创建
         if (!targetDialogueId) {
             try {
                 const newTitle = text.slice(0, 20) + (text.length > 20 ? "..." : "");
@@ -450,7 +449,7 @@ export default function AiAssistantView() {
                 targetDialogueId = res.id;
                 setCurrentDialogueId(targetDialogueId);
                 setLastDialogueId(userId, targetDialogueId);
-                // Refresh list
+                // 刷新列表
                 await loadDialogues(userId);
             } catch (e) {
                 alert("创建对话失败: " + e.message);
@@ -458,14 +457,14 @@ export default function AiAssistantView() {
             }
         }
 
-        // Add user message locally
+        // 在本地添加用户消息
         const userMsg = { role: 'user', content: text };
         setMessages(prev => [...prev, userMsg]);
 
-        // Start streaming
+        // 开始流式传输
         setIsStreaming(true);
         activeStreamDialogueIdRef.current = targetDialogueId;
-        const assistantMsg = { role: 'assistant', content: [] }; // Content will be array of segments
+        const assistantMsg = { role: 'assistant', content: [] }; // 内容将是段落数组
         setMessages(prev => [...prev, assistantMsg]);
 
         try {
@@ -524,7 +523,7 @@ export default function AiAssistantView() {
                                 await yieldToBrowser();
                             }
                         } catch (e) {
-                            console.error("Parse error", e);
+                            console.error("解析错误", e);
                         }
                     }
                 }
@@ -534,7 +533,7 @@ export default function AiAssistantView() {
             if (e?.name !== 'AbortError') {
                 console.error(e);
                 traceLog('FE.SSE', 'stream.error', { message: String(e?.message || e) });
-                setMessages(prev => [...prev, { role: 'system', content: "Error: " + e.message }]);
+                setMessages(prev => [...prev, { role: 'system', content: "错误: " + e.message }]);
             } else {
                 traceLog('FE.SSE', 'stream.abort', { dialogueId: targetDialogueId });
             }
@@ -574,10 +573,10 @@ export default function AiAssistantView() {
             const startedAt = performance.now();
             const newMessages = [...prev];
             const lastMsgIndex = newMessages.length - 1;
-            // Deep copy the last message and its content to ensure immutability
+            // 深拷贝最后一条消息及其内容以确保不可变性
             const lastMsg = { ...newMessages[lastMsgIndex] };
             
-            // Ensure content is array (and copy it)
+            // 确保内容是数组（并复制它）
             if (typeof lastMsg.content === 'string') {
                 lastMsg.content = [{ type: 'text', text: lastMsg.content }];
             } else if (Array.isArray(lastMsg.content)) {
@@ -586,7 +585,7 @@ export default function AiAssistantView() {
                 lastMsg.content = [];
             }
             
-            // Update the message in the new array
+            // 更新新数组中的消息
             newMessages[lastMsgIndex] = lastMsg;
 
             if (event === 'partial_text') {
@@ -595,14 +594,14 @@ export default function AiAssistantView() {
                 const lastSegment = lastMsg.content[lastSegmentIndex];
                 
                 if (lastSegment && lastSegment.type === 'text') {
-                    // Create new segment object to avoid mutation
+                    // 创建新的片段对象以避免直接修改
                     lastMsg.content[lastSegmentIndex] = { ...lastSegment, text: lastSegment.text + text };
                 } else {
                     lastMsg.content.push({ type: 'text', text: text });
                 }
             } else if (event === 'cards') {
                 data.cards.forEach(card => {
-                    // Prevent duplicate cards (check by action_id if available)
+                    // 防止重复卡片（如果有 action_id 则进行检查）
                     const isDuplicate = lastMsg.content.some(c => 
                         c.type === 'card' && 
                         c.data && 
@@ -627,7 +626,7 @@ export default function AiAssistantView() {
                             }
                         }
                         
-                        // Check for auto-confirmed actions (or actions confirmed by backend immediately)
+                        // 检查自动确认的操作（或后端立即确认的操作）
                         if (card.user_confirmation === 'Y') {
                             if ([1, 2, 3, 4].includes(card.type)) {
                                 taskEventBus.emit('task-updated');
@@ -638,7 +637,7 @@ export default function AiAssistantView() {
                     }
                 });
             } else if (event === 'error') {
-                lastMsg.content.push({ type: 'text', text: `\n[Error: ${data.message}]` });
+                lastMsg.content.push({ type: 'text', text: `\n[错误: ${data.message}]` });
             }
 
             const costMs = Math.round(performance.now() - startedAt);
@@ -667,17 +666,17 @@ export default function AiAssistantView() {
         const xDiff = touchEnd.x - touchStartRef.current.x;
         const yDiff = touchEnd.y - touchStartRef.current.y;
         
-        // Reset
+        // 重置
         touchStartRef.current = null;
         
-        // Horizontal swipe detection (threshold 50px, and horizontal > vertical)
+        // 水平滑动检测 (阈值 50px，且水平 > 垂直)
         if (Math.abs(xDiff) > 50 && Math.abs(xDiff) > Math.abs(yDiff)) {
-            // Swipe Right (Open)
+            // 右滑（打开）
             if (xDiff > 0 && !sidebarOpen) {
-                // Only allow opening if started from the left edge area (e.g. first 50% of screen)
+                // 仅允许从左侧边缘区域（如屏幕的前 50%）开始打开
                 setSidebarOpen(true);
             }
-            // Swipe Left (Close)
+            // 左滑（关闭）
             else if (xDiff < 0 && sidebarOpen) {
                 setSidebarOpen(false);
             }
@@ -701,7 +700,7 @@ export default function AiAssistantView() {
             onTouchEnd={handleTouchEnd}
         >
             
-            {/* Sidebar Backdrop (Mobile) */}
+            {/* 侧边栏遮罩层（移动端） */}
             {sidebarOpen && (
                 <div 
                     className="fixed inset-0 bg-black/20 z-30 md:hidden backdrop-blur-sm"
@@ -709,13 +708,13 @@ export default function AiAssistantView() {
                 ></div>
             )}
 
-            {/* Sidebar */}
+            {/* 侧边栏 */}
             <div className={`${sidebarOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full md:w-0 md:translate-x-0'} fixed md:relative z-40 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 flex flex-col overflow-hidden shadow-2xl md:shadow-none`}>
                 <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
                     <h2 className="font-bold text-lg dark:text-white truncate">历史对话</h2>
                 </div>
                 
-                {/* New Chat Button */}
+                {/* 新建对话按钮 */}
                 <div className="p-2">
                     <button 
                         onClick={() => selectDialogue(null)}
@@ -726,7 +725,7 @@ export default function AiAssistantView() {
                     </button>
                 </div>
 
-                {/* Dialogue List */}
+                {/* 对话列表 */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {dialogues.map(d => (
                         <div key={d.id} className="group relative">
@@ -747,7 +746,7 @@ export default function AiAssistantView() {
                     ))}
                 </div>
 
-                {/* Settings Button (Fixed at bottom) */}
+                {/* 设置按钮（固定在底部） */}
                 <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 z-10">
                     <button 
                         onClick={() => setSettingsOpen(true)}
@@ -759,7 +758,7 @@ export default function AiAssistantView() {
                 </div>
             </div>
 
-            {/* Toggle Sidebar Button (Floating) */}
+            {/* 切换侧边栏按钮（悬浮） */}
             <button 
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className={`absolute top-4 ${sidebarOpen ? 'left-64' : 'left-0'} ml-2 z-20 p-2 text-gray-500 hover:text-primary transition-all hidden md:block`}
@@ -767,9 +766,9 @@ export default function AiAssistantView() {
                 <i className={`fa-solid ${sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'}`}></i>
             </button>
 
-            {/* Main Chat Area */}
+            {/* 主聊天区域 */}
             <div className="flex-1 flex flex-col h-full relative">
-                {/* Header */}
+                {/* 头部 */}
                 <div className="h-16 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm z-10">
                     <div>
                         <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
@@ -778,7 +777,7 @@ export default function AiAssistantView() {
                     </div>
                 </div>
 
-                {/* Messages */}
+                {/* 消息 */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                     {messages.length === 0 && !currentDialogueId && (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-60">
@@ -793,7 +792,7 @@ export default function AiAssistantView() {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input Area */}
+                {/* 输入区域 */}
                 <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
                     <div className="max-w-4xl mx-auto relative">
                         <textarea
@@ -820,7 +819,7 @@ export default function AiAssistantView() {
                 </div>
             </div>
 
-            {/* Settings Modal */}
+            {/* 设置弹窗 */}
             {settingsOpen && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
@@ -1005,12 +1004,12 @@ const markdownComponents = {
 };
 
 function MessageItem({ role, content, userId, onCardConfirmationChange }) {
-    // If content is just a string (old format or simple message)
+    // 如果内容只是字符串（旧格式或简单消息）
     if (typeof content === 'string') {
         content = [{ type: 'text', text: content }];
     }
     
-    // Safety check
+    // 安全检查
     if (!Array.isArray(content)) content = [];
 
     const isUser = role === 'user';
@@ -1052,7 +1051,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
         if (user_confirmation === 'Y') return 'confirmed';
         if (user_confirmation === 'N') return 'cancelled';
         return null;
-    }); // 'confirming', 'cancelling', 'confirmed', 'cancelled', 'failed'
+    }); // 'confirming', 'cancelling', 'confirmed', 'cancelled', 'failed' (确认中, 取消中, 已确认, 已取消, 失败)
     const [subTaskDetails, setSubTaskDetails] = useState({});
     const [longTermTaskDetails, setLongTermTaskDetails] = useState({});
 
@@ -1062,13 +1061,13 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
         else if (actionStatus === 'confirmed' || actionStatus === 'cancelled') setActionStatus(null);
     }, [user_confirmation, actionStatus]);
 
-    // Fetch details for referenced tasks (Subtasks and Long Term Tasks)
+    // 获取引用任务的详细信息（子任务和长期任务）
     useEffect(() => {
         const fetchDetails = async () => {
-            // 1. Identify Subtasks to fetch
+            // 1. 识别要获取的子任务
             let subTaskIdsToFetch = new Set();
             
-            // For Create Long Term Task (Type 4)
+            // 用于创建长期任务（类型 4）
             if (type === 4 && data.sub_task_ids) {
                 const ids = typeof data.sub_task_ids === 'string' 
                     ? Object.keys(JSON.parse(data.sub_task_ids)) 
@@ -1076,7 +1075,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                 ids.forEach(id => subTaskIdsToFetch.add(id));
             }
 
-            // For Update Task (Type 3) - specifically for sub_task_ids changes
+            // 用于更新任务 (类型 3) - 特别是子任务 ID 的变更
             if (type === 3 && (data.updated?.sub_task_ids || data.original?.sub_task_ids)) {
                 const parseIds = (val) => {
                     if (!val) return [];
@@ -1090,14 +1089,14 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                     .forEach(id => subTaskIdsToFetch.add(id));
             }
 
-            // 2. Identify Long Term Tasks to fetch
+            // 2. 识别要获取的长期任务
             let longTermIdsToFetch = new Set();
             if (type === 3 && (data.updated?.long_term_task_id || data.original?.long_term_task_id)) {
                 if (data.updated?.long_term_task_id) longTermIdsToFetch.add(data.updated.long_term_task_id);
                 if (data.original?.long_term_task_id) longTermIdsToFetch.add(data.original.long_term_task_id);
             }
 
-            // 3. Fetch Subtasks
+            // 3. 获取子任务
             const subIds = Array.from(subTaskIdsToFetch);
             if (subIds.length > 0) {
                 const details = {};
@@ -1106,14 +1105,14 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                         const task = await api.getTaskById(id);
                         details[id] = task;
                     } catch (e) {
-                        console.error(`Failed to fetch task ${id}`, e);
+                        console.error(`获取任务 ${id} 失败`, e);
                         details[id] = { title: `任务 #${id}` }; 
                     }
                 }));
                 setSubTaskDetails(prev => ({ ...prev, ...details }));
             }
 
-            // 4. Fetch Long Term Tasks
+            // 4. 获取长期任务
             const ltIds = Array.from(longTermIdsToFetch);
             if (ltIds.length > 0) {
                 const details = {};
@@ -1122,7 +1121,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                         const task = await api.getLongTermTaskById(id);
                         details[id] = task;
                     } catch (e) {
-                        console.error(`Failed to fetch long term task ${id}`, e);
+                        console.error(`获取长期任务 ${id} 失败`, e);
                         details[id] = { title: `长期任务 #${id}` };
                     }
                 }));
@@ -1143,12 +1142,12 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                 setActionStatus('confirmed');
                 onCardConfirmationChange?.(action_id, 'Y');
                 
-                // Update other views via EventBus
-                // Type 1: Create Task, 2: Delete Task, 3: Update Task, 4: Create Long Term
+                // 通过 EventBus 更新其他视图
+                // 类型 1: 创建任务, 2: 删除任务, 3: 更新任务, 4: 创建长期任务
                 if ([1, 2, 3, 4].includes(type)) {
                      taskEventBus.emit('task-updated');
                 } else if (type === 7) {
-                     // Type 7: Update Journal
+                     // 类型 7: 更新日记
                      taskEventBus.emit('journal-updated');
                 }
             } else {
@@ -1171,7 +1170,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
 
     const renderCardContent = () => {
         switch (type) {
-            case 1: // Create Task
+            case 1: // 创建任务
                 return (
                     <div className="border-l-4 border-green-500 pl-3 py-1 bg-green-50 dark:bg-green-900/20">
                         <h4 className="font-bold text-green-700 dark:text-green-400 mb-1">🆕 创建任务</h4>
@@ -1180,7 +1179,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                         {data.due_date && <div><strong>截止:</strong> {data.due_date}</div>}
                     </div>
                 );
-            case 2: { // Delete Task
+            case 2: { // 删除任务
                 const showDesc = data.description && !data.description.toString().startsWith('ID:');
                 return (
                     <div className="border-l-4 border-red-500 pl-3 py-1 bg-red-50 dark:bg-red-900/20">
@@ -1190,11 +1189,11 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                     </div>
                 );
             }
-            case 3: // Update Task
+            case 3: // 更新任务
                 return (
                     <div className="border-l-4 border-blue-500 pl-3 py-1 bg-blue-50 dark:bg-blue-900/20">
                         <h4 className="font-bold text-blue-700 dark:text-blue-400 mb-1">📝 更新任务</h4>
-                        {/* ID hidden as requested */}
+                        {/* 按要求隐藏 ID */}
                         <div className="mt-2 space-y-2">
                             {Object.keys(data.updated).map(key => {
                                 if (['id', 'user_id', 'created_at', 'updated_at', 'priority'].includes(key)) return null;
@@ -1219,10 +1218,10 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                                                     const task = subTaskDetails[id];
                                                     const taskTitle = task ? task.title : `任务 #${id}`;
                                                     
-                                                    if (oldWeight === newWeight) return null; // No change for this specific task
+                                                    if (oldWeight === newWeight) return null; // 该任务没有变化
                                                     
                                                     if (oldWeight === undefined) {
-                                                        // Added
+                                                        // 新增
                                                         return (
                                                             <div key={id} className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 p-1 rounded border border-green-100 dark:border-green-800">
                                                                 <span className="text-green-600 dark:text-green-400 font-bold">+</span>
@@ -1231,7 +1230,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                                                             </div>
                                                         );
                                                     } else if (newWeight === undefined) {
-                                                        // Removed
+                                                        // 移除
                                                         return (
                                                             <div key={id} className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 p-1 rounded border border-red-100 dark:border-red-800">
                                                                 <span className="text-red-600 dark:text-red-400 font-bold">-</span>
@@ -1240,7 +1239,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                                                             </div>
                                                         );
                                                     } else {
-                                                        // Changed
+                                                        // 变更
                                                         return (
                                                             <div key={id} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 p-1 rounded border border-blue-100 dark:border-blue-800">
                                                                 <span className="text-blue-600 dark:text-blue-400 font-bold">~</span>
@@ -1255,7 +1254,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                                     );
                                 }
 
-                                // Format values for display
+                                // 格式化显示值
                                 let displayOld = oldVal;
                                 let displayNew = newVal;
                                 let label = key;
@@ -1303,7 +1302,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                         </div>
                     </div>
                 );
-            case 4: // Create Long Term Task
+            case 4: // 创建长期任务
                 return (
                     <div className="border-l-4 border-purple-500 pl-3 py-1 bg-purple-50 dark:bg-purple-900/20">
                         <h4 className="font-bold text-purple-700 dark:text-purple-400 mb-1">🚀 创建长期任务</h4>
@@ -1333,7 +1332,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
                         )}
                     </div>
                 );
-            case 7: // Update Journal
+            case 7: // 更新日记
                  return (
                     <div className="border-l-4 border-orange-500 pl-3 py-1 bg-orange-50 dark:bg-orange-900/20">
                         <h4 className="font-bold text-orange-700 dark:text-orange-400 mb-1">📔 更新日记</h4>
@@ -1359,7 +1358,7 @@ function CardItem({ card, userId, onCardConfirmationChange }) {
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-2 my-2 text-sm">
             {renderCardContent()}
             
-            {/* Action Buttons */}
+            {/* 操作按钮 */}
             {action_id && (
                 <div className="mt-3 flex gap-2">
                     {actionStatus === 'confirmed' ? (

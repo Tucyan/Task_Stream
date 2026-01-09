@@ -10,7 +10,7 @@ export default function JournalView({ userId }) {
   const [journalContent, setJournalContent] = useState('')
   const [journalStatus, setJournalStatus] = useState([])
   const [isPreview, setIsPreview] = useState(false)
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false) // Mobile calendar toggle state
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false) // 移动端日历展开状态
   const [refreshKey, setRefreshKey] = useState(0)
 
   const year = currentDate.getFullYear()
@@ -19,7 +19,7 @@ export default function JournalView({ userId }) {
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const firstDayOfMonth = new Date(year, month, 1).getDay()
 
-  // Fetch journal status for the current month
+  // 获取当前月份的日志状态
   useEffect(() => {
     if (userId) {
       api.getJournalStatus(year, month + 1, userId)
@@ -32,12 +32,12 @@ export default function JournalView({ userId }) {
   }, [year, month, userId, refreshKey]);
 
   useEffect(() => {
-    // Construct date string YYYY-MM-DD
+    // 构建日期字符串 YYYY-MM-DD
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
     api.getJournalByDate(dateStr, userId)
       .then(data => {
         setJournalContent(data ? data.content : '');
-        // If there is content, default to preview mode, otherwise edit mode
+        // 如果有内容，默认为预览模式，否则为编辑模式
         setIsPreview(!!(data && data.content));
       })
       .catch(console.error);
@@ -58,14 +58,14 @@ export default function JournalView({ userId }) {
     api.updateJournalContent(dateStr, journalContent, userId)
       .then(res => {
         if(res.success) {
-          // Refresh journal status list
+          // 刷新日志状态列表
           api.getJournalStatus(year, month + 1, userId)
             .then(statusList => {
               console.log('Refreshed journal status list:', statusList);
               setJournalStatus(statusList || []);
             })
             .catch(console.error);
-          alert('日志保存成功！'); // Or a better notification
+          alert('日志保存成功！'); // 或者使用更好的通知组件
         }
       })
       .catch(console.error);
@@ -83,7 +83,7 @@ export default function JournalView({ userId }) {
 
   const handleDayClick = (day) => {
     setSelectedDay(day)
-    setIsCalendarOpen(false) // Close calendar after selection on mobile
+    setIsCalendarOpen(false) // 移动端选择后关闭日历
   }
   return (
     <div className="h-full flex flex-col md:flex-row gap-4 md:gap-6 md:max-w-7xl mx-auto relative">
@@ -149,9 +149,15 @@ export default function JournalView({ userId }) {
         </div>
         <div className="mt-auto pt-6 border-t border-gray-100 dark:border-gray-700">
           <div className="text-xs text-gray-400 mb-2">统计</div>
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center mb-2">
             <span className="dark:text-gray-300">本月已写</span>
-            <span className="font-bold text-xl text-primary">{journalStatus.filter(Boolean).length} <span className="text-xs text-gray-400 font-normal">篇</span></span>
+            <span className="font-bold text-xl text-primary">{journalStatus.filter(Boolean).length} <span className="text-xs text-gray-400 font-normal">/ {daysInMonth} 篇</span></span>
+          </div>
+          <div className="w-full bg-gray-100 dark:bg-black/20 rounded-full h-1.5 overflow-hidden">
+            <div 
+              className="bg-primary h-full transition-all duration-1000" 
+              style={{ width: `${(journalStatus.filter(Boolean).length / daysInMonth) * 100}%` }}
+            />
           </div>
         </div>
       </div>
@@ -163,37 +169,57 @@ export default function JournalView({ userId }) {
         ></div>
       )}
 
-      <div className="flex-1 bg-card rounded-3xl p-4 md:p-8 shadow-sm flex flex-col relative overflow-hidden h-[calc(100vh-140px)] md:h-auto">
-        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-          <i className="fa-solid fa-feather text-9xl"></i>
-        </div>
-        <div className="flex justify-between items-end mb-4 md:mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
-          <div>
-            <h2 className="text-3xl font-bold text-primary">{month + 1}月 {selectedDay}日</h2>
-            <p className="text-sm opacity-60 mt-1 dark:text-gray-400">记录此刻的想法...</p>
+      {/* 内容区域 */}
+      <div className="flex-1 bg-card md:rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col min-w-0 mb-4 md:mb-0">
+        <div className="p-4 md:p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+              <i className="fa-solid fa-pen-nib text-lg md:text-xl"></i>
+            </div>
+            <div>
+              <h2 className="text-lg md:text-xl font-bold dark:text-white">{year}年{month + 1}月{selectedDay}日</h2>
+              <p className="text-xs md:text-sm text-gray-400">
+                {journalStatus[selectedDay-1] ? '今日已记录' : '记录此刻的想法...'}
+              </p>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
+          <div className="flex items-center gap-2 md:gap-3">
+            <button 
               onClick={() => setIsPreview(!isPreview)}
-              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-600"
+              className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 transition-all"
+              title={isPreview ? "编辑" : "预览"}
             >
-              {isPreview ? <span><span className="hidden sm:inline">编辑模式</span><span className="sm:hidden">编辑</span></span> : <span><span className="hidden sm:inline">预览 Markdown</span><span className="sm:hidden">预览</span></span>}
+              <i className={`fa-solid ${isPreview ? 'fa-pen-to-square' : 'fa-eye'} text-sm md:text-base`}></i>
             </button>
-            <button onClick={saveJournal} className="px-4 py-2 bg-primary text-white rounded-lg text-sm shadow hover:brightness-110"><span className="hidden sm:inline">保存日志</span><span className="sm:hidden">保存</span></button>
+            <button 
+              onClick={saveJournal}
+              className="bg-primary text-white px-4 md:px-6 py-2 md:py-2.5 rounded-lg md:rounded-xl shadow-lg shadow-primary/30 hover:brightness-110 transition-all flex items-center gap-2 text-sm md:text-base"
+            >
+              <i className="fa-solid fa-check"></i>
+              <span className="hidden sm:inline">保存记录</span>
+              <span className="sm:hidden">保存</span>
+            </button>
           </div>
         </div>
-        {isPreview ? (
-          <div className="flex-1 w-full overflow-y-auto p-2 md:p-4 prose dark:prose-invert max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{journalContent}</ReactMarkdown>
-          </div>
-        ) : (
-          <textarea 
-            value={journalContent} 
-            onChange={(e) => setJournalContent(e.target.value)} 
-            className="flex-1 w-full bg-transparent border-none outline-none resize-none font-mono text-base leading-relaxed p-2 md:p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:bg-gray-50 dark:focus:bg-gray-800 focus:ring-0 dark:text-gray-200" 
-            placeholder="# 今日总结\n\n- 完成了 Task Stream 的原型设计\n- 学习了 Vue3 的新特性\n\n感觉效率很高，明天继续保持。" 
-          />
-        )}
+
+        <div className="flex-1 overflow-hidden relative">
+          {isPreview ? (
+            <div className="h-full overflow-y-auto p-4 md:p-8">
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {journalContent || '*今日暂无记录，点击右上角编辑按钮开始写作...*'}
+                </ReactMarkdown>
+              </div>
+            </div>
+          ) : (
+            <textarea
+              value={journalContent}
+              onChange={(e) => setJournalContent(e.target.value)}
+              placeholder="在这里输入你的日志内容，支持 Markdown 语法..."
+              className="w-full h-full p-4 md:p-8 bg-transparent outline-none resize-none text-sm md:text-lg leading-relaxed dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-600"
+            />
+          )}
+        </div>
       </div>
     </div>
   )

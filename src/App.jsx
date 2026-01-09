@@ -19,7 +19,7 @@ function App() {
   const [currentView, setCurrentView] = useState('home')
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [showResultModal, setShowResultModal] = useState(false)
-  const [userId, setUserId] = useState(1) // Mock user ID
+  const [userId, setUserId] = useState(1) // 模拟用户 ID
   const [user, setUser] = useState(null) // 存储用户信息
   const reminderNotifInitRef = useRef(false)
   const reminderNotifListenerRef = useRef(null)
@@ -68,7 +68,7 @@ function App() {
     return `reminders_v${v}_s${s}`
   }
 
-  // Loading Screen States
+  // 加载屏幕状态
   const [isLoading, setIsLoading] = useState(true)
   const [isFadingOut, setIsFadingOut] = useState(false)
   const [heatmapTrigger, setHeatmapTrigger] = useState(0)
@@ -78,7 +78,7 @@ function App() {
     setTimeout(() => {
       setIsLoading(false)
       setIsFadingOut(false)
-    }, 500) // Duration matches CSS transition
+    }, 500) // 持续时间与 CSS 过渡匹配
   }
 
   // 在组件初始化时检查localStorage中的登录状态和设置
@@ -179,7 +179,7 @@ function App() {
     setUser(updatedUser)
   }
 
-  // Task Modal State
+  // 任务弹窗状态
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [showReminderQueueModal, setShowReminderQueueModal] = useState(false)
@@ -478,7 +478,7 @@ function App() {
     theme_mode: 'light'
   })
 
-  // Load settings from backend
+  // 从后端加载设置
   const loadSettings = async (uid) => {
     try {
       const data = await api.getSettings(uid)
@@ -500,7 +500,7 @@ function App() {
     }
   }
 
-  // Save settings to backend
+  // 保存设置到后端
   const saveSettings = (newSettings) => {
     const settingsData = {
       user_id: userId,
@@ -516,18 +516,18 @@ function App() {
     
     api.updateSettings(userId, settingsData)
       .then(updated => {
-          console.log('Settings updated:', updated)
-          setSettings(newSettings) // Ensure state is consistent
+          console.log('设置已更新:', updated)
+          setSettings(newSettings) // 确保状态一致
       })
       .catch(err => {
-          // If update failed, maybe settings don't exist yet
-          console.log('Update failed, trying to create settings...', err)
+          // 如果更新失败，可能设置尚不存在
+          console.log('更新失败，尝试创建设置...', err)
           api.createSettings(settingsData)
             .then(created => {
-                console.log('Settings created:', created)
+                console.log('设置已创建:', created)
                 setSettings(newSettings)
             })
-            .catch(e => console.error('Failed to save settings:', e))
+            .catch(e => console.error('无法保存设置:', e))
       })
   }
 
@@ -540,9 +540,9 @@ function App() {
   const [filterDateEnd, setFilterDateEnd] = useState('')
   const [detailedTasks, setDetailedTasks] = useState([])
 
-  // Helper to refresh tasks
+  // 刷新任务的辅助函数
   const refreshTasks = () => {
-      // 获取本地时区的今天日期，避免UTC时差问题
+      // 获取本地时区的今天日期，避免 UTC 时差问题
       const now = new Date();
       const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
       api.getTasksInDateRange(today, today, userId)
@@ -561,7 +561,7 @@ function App() {
         })
         .catch(console.error);
 
-      // Fetch detailed tasks based on whether date filters are set
+      // 根据是否设置了日期筛选器来获取详细任务
       if(filterDateStart && filterDateEnd) {
           api.getTasksInDateRange(filterDateStart, filterDateEnd, userId)
             .then(tasks => {
@@ -586,7 +586,7 @@ function App() {
             })
             .catch(console.error);
       } else {
-          // If no date range is specified, fetch all tasks for the user
+          // 如果未指定日期范围，则获取用户的所有任务
           api.getAllTasksForUser(userId)
             .then(tasks => {
                 console.log('[App] refreshTasks - detailedTasks (all) raw API response:', tasks);
@@ -612,7 +612,7 @@ function App() {
       }
   }
 
-  // Fetch today's tasks
+  // 获取今日任务
   useEffect(() => {
     if (isLoggedIn) {
       refreshTasks();
@@ -641,30 +641,30 @@ function App() {
     { title: '服务器续费', date: '2025-12-20', level: 'low', countdown: '15:00:00', progress: 20 }
   ])
   
-  // Fetch uncompleted long term tasks for deadlines
+  // 获取未完成的长期任务作为截止日期
   useEffect(() => {
      if(isLoggedIn) {
          api.getAllUncompletedLongTermTasks(userId)
             .then(tasks => {
-                // Map to deadline format
+                // 映射到截止日期格式
                 const mappedDeadlines = tasks.map(t => ({
                     title: t.title,
                     date: t.due_date,
-                    level: 'medium', // Default or logic to determine
-                    countdown: '00:00:00', // Need logic to calc
+                    level: 'medium', // 默认或逻辑判断
+                    countdown: '00:00:00', // 需要计算逻辑
                     progress: t.progress * 100
                 }));
-                // setDeadlines(mappedDeadlines); // Uncomment to use real data
+                // setDeadlines(mappedDeadlines); // 使用真实数据时取消此行注释 (Uncomment when using real data)
             })
             .catch(console.error);
      }
   }, [isLoggedIn, userId])
 
-  // Fetch detailed tasks when filter changes
+  // 当筛选器更改时获取详细任务
   useEffect(() => {
       if(isLoggedIn) {
           if(filterDateStart && filterDateEnd) {
-              // If date range is specified, fetch tasks in that range
+              // 如果指定了日期范围，则获取该范围内的任务
               api.getTasksInDateRange(filterDateStart, filterDateEnd, userId)
                 .then(tasks => {
                     console.log('[App] useEffect - detailedTasks (range) raw API response:', tasks);
@@ -688,7 +688,7 @@ function App() {
                 })
                 .catch(console.error);
           } else {
-              // If no date range is specified, fetch all tasks for the user
+              // 如果未指定日期范围，则获取用户的所有任务
               api.getAllTasksForUser(userId)
                 .then(tasks => {
                     console.log('[App] useEffect - detailedTasks (all) raw API response:', tasks);
@@ -757,9 +757,9 @@ function App() {
       if (detailFilter === 'completed' && !task.completed) return false
       return true
     }).sort((a, b) => {
-      // Handle null dates by placing them at the end
+      // 将空日期置于末尾
       if (a.date === null && b.date === null) {
-        // Both dates are null, compare start times
+        // 日期均为空，比较开始时间
         if (a.startTime === null && b.startTime === null) return 0;
         if (a.startTime === null) return 1;
         if (b.startTime === null) return -1;
@@ -768,10 +768,10 @@ function App() {
       if (a.date === null) return 1;
       if (b.date === null) return -1;
       
-      // Compare dates if they are different
+      // 如果日期不同，比较日期
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       
-      // Dates are the same, compare start times with null checks
+      // 日期相同，比较开始时间（含空值检查）
       if (a.startTime === null && b.startTime === null) return 0;
       if (a.startTime === null) return 1;
       if (b.startTime === null) return -1;
@@ -822,10 +822,10 @@ function App() {
 
   const toggleTask = (index) => {
     const t = todayTasks[index]
-    const newStatus = t.completed ? 0 : 3 // Toggle between 0 and 3
+    const newStatus = t.completed ? 0 : 3 // 在 0 和 3 之间切换
     const newTask = { ...t, status: newStatus, completed: !t.completed }
     
-    // Optimistic update
+    // 乐观更新
     setTodayTasks((prev) => {
       const next = [...prev]
       next[index] = newTask
@@ -861,7 +861,7 @@ function App() {
       })
       .catch(err => {
         console.error("Failed to update task", err)
-        // Revert on failure
+        // 失败时回滚
         setTodayTasks((prev) => {
             const next = [...prev]
             next[index] = t
@@ -880,9 +880,9 @@ function App() {
       ? { ...settings, bg: '#0f172a', card: '#1e293b', text: '#f8fafc', theme_mode: 'dark' }
       : { ...settings, bg: '#f3f4f6', card: '#ffffff', text: '#1f2937', theme_mode: 'light' }
     
-    // Optimistically update state
+    // 乐观更新状态
     setSettings(newSettings)
-    // Persist to backend
+    // 持久化到后端
     saveSettings(newSettings)
   }
 
@@ -942,7 +942,7 @@ function App() {
       })
   }
 
-  // Task CRUD Handlers
+  // 任务 CRUD 处理程序
   const handleAddTask = () => {
     setEditingTask(null)
     setShowTaskModal(true)
@@ -1021,7 +1021,7 @@ function App() {
   const handleHeatmapClick = (dateStr) => {
     setFilterDateStart(dateStr)
     setFilterDateEnd(dateStr)
-    setDetailFilter('all') // Reset status filter to show all tasks for that day
+    setDetailFilter('all') // 重置状态筛选器以显示该天的所有任务
   }
 
   return (
@@ -1115,7 +1115,7 @@ function App() {
                   presetColors={presetColors}
                   resetTheme={resetTheme}
                   saveSettings={saveSettings}
-                  // Pass user data to SettingsView for mobile profile management
+                  // 将用户数据传递给 SettingsView 用于移动端个人资料管理
                   user={user}
                   onLogout={() => {
                     setIsLoggedIn(false)
@@ -1126,7 +1126,7 @@ function App() {
                   }}
                   onUserUpdate={handleUserUpdate}
                   onOpenReminderEditor={() => setShowReminderQueueModal(true)}
-                  // New props for CRUD
+                  // 增删改查 (CRUD) 的新属性
                   onAddTask={handleAddTask}
                   onEditTask={handleEditTask}
                   onDeleteTask={handleDeleteTask}

@@ -76,7 +76,7 @@ export default function Sidebar({ currentView, setCurrentView, primaryColor, use
    * @returns {Object} - CSS样式对象
    */
   const getHeatmapCellStyle = (day) => {
-    // heatmapData索引0对应日期1
+    // 热力图数据 (heatmapData) 索引 0 对应日期 1
     const level = heatmapData[day - 1] || 0
     
     if (level === 0) return {}

@@ -6,9 +6,9 @@ export default function MobileNav({ currentView, setCurrentView, primaryColor, u
   const [heatmapDate, setHeatmapDate] = useState(new Date())
   const [heatmapData, setHeatmapData] = useState([])
   
-  // Auto-scale logic
+  // 自动缩放逻辑
   const [scale, setScale] = useState(1)
-  const MIN_REQUIRED_WIDTH = 370 // 7 buttons * ~50px + padding
+  const MIN_REQUIRED_WIDTH = 370 // 7 个按钮 * ~50px + 内边距
 
   useEffect(() => {
     const handleResize = () => {
@@ -34,7 +34,7 @@ export default function MobileNav({ currentView, setCurrentView, primaryColor, u
   const cellsToFill = 42 - totalCells
 
   useEffect(() => {
-    if (!userId || !showHeatmap) return // Only fetch if visible to save bandwidth
+    if (!userId || !showHeatmap) return // 仅在可见时获取数据以节省带宽
     
     const fetchHeatmap = async () => {
       try {
@@ -91,7 +91,7 @@ export default function MobileNav({ currentView, setCurrentView, primaryColor, u
 
   return (
     <nav className={`w-full bg-card border-t border-gray-200 dark:border-gray-700 flex flex-col z-20 transition-colors duration-300 ${className}`}>
-      {/* Collapsible Heatmap Area - Moved to top of bottom bar so it expands upwards */}
+      {/* 可折叠的热力图区域 - 移动到工具栏上方，使其向上展开 */}
       {showHeatmap && (
         <div className="border-b border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/50 animate-in slide-in-from-bottom-2 duration-200 order-first">
           <div className="flex justify-between items-center mb-3">
@@ -120,7 +120,7 @@ export default function MobileNav({ currentView, setCurrentView, primaryColor, u
                     onClick={() => {
                       setCurrentView('detail')
                       onHeatmapClick && onHeatmapClick(dayStr)
-                      setShowHeatmap(false) // Auto close on selection
+                      setShowHeatmap(false) // 选中后自动关闭
                     }} 
                     className="w-full pt-[100%] rounded-sm cursor-pointer hover:ring-2 ring-primary relative transition-all border border-gray-100 dark:border-gray-700" 
                     style={getHeatmapCellStyle(n)}
@@ -137,7 +137,7 @@ export default function MobileNav({ currentView, setCurrentView, primaryColor, u
         </div>
       )}
 
-      {/* Main Toolbar */}
+      {/* 主工具栏 */}
       <div className="flex items-center justify-center px-2 py-2 order-last overflow-hidden">
         <div 
           className="flex justify-between"

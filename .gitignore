@@ -62,5 +62,13 @@ coverage
 build
 *.tsbuildinfo
 .gradle/
-签名注意.txt
 .android-sdk
+签名注意.txt
+
+# Documentation
+*.md
+!README.md
+
+# Logs and Reports
+流式输出问题解决记录/
+

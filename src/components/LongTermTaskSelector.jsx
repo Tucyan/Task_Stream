@@ -17,6 +17,7 @@ export default function LongTermTaskSelector({ visible, onClose, onSelect, curre
   const fetchLongTermTasks = async () => {
     setLoading(true)
     try {
+      // 获取长期任务
       const tasks = await api.getAllUncompletedLongTermTasks(currentUserId)
       setLongTermTasks(tasks)
     } catch (error) {

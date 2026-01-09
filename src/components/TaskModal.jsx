@@ -67,7 +67,7 @@ export default function TaskModal({ visible, onClose, onSave, task, currentUserI
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="bg-card w-full max-w-2xl rounded-2xl shadow-2xl transform transition-all flex flex-col max-h-[90vh] border border-gray-100 dark:border-gray-700">
-        {/* Header */}
+        {/* 头部 */}
         <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-800 dark:text-white">
             {task ? '编辑任务' : '新建任务'}
@@ -80,11 +80,11 @@ export default function TaskModal({ visible, onClose, onSave, task, currentUserI
           </button>
         </div>
         
-        {/* Body */}
+        {/* 主体 */}
         <div className="p-6 overflow-y-auto custom-scrollbar">
           <div className="space-y-6">
             
-            {/* Title Section */}
+            {/* 标题区域 */}
             <div>
               <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">任务标题</label>
               <input 
@@ -96,7 +96,7 @@ export default function TaskModal({ visible, onClose, onSave, task, currentUserI
               />
             </div>
 
-            {/* Time & Date Row */}
+            {/* 时间和日期行 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">执行日期</label>
@@ -129,7 +129,7 @@ export default function TaskModal({ visible, onClose, onSave, task, currentUserI
               </div>
             </div>
 
-            {/* Tags & Options Row */}
+            {/* 标签和选项行 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">标签</label>
@@ -169,7 +169,7 @@ export default function TaskModal({ visible, onClose, onSave, task, currentUserI
               </div>
             </div>
             
-            {/* Description Section */}
+            {/* 描述区域 */}
             <div>
               <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">任务描述</label>
               <textarea 
@@ -180,7 +180,7 @@ export default function TaskModal({ visible, onClose, onSave, task, currentUserI
               />
             </div>
 
-            {/* Result Description (Only for existing tasks) */}
+            {/* 成果描述 (仅限现有任务) */}
             {task && (
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">成果总结</label>
@@ -195,7 +195,7 @@ export default function TaskModal({ visible, onClose, onSave, task, currentUserI
           </div>
         </div>
 
-        {/* Footer */}
+        {/* 底部 */}
         <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex gap-4">
           <button 
             onClick={onClose} 

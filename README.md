@@ -122,6 +122,18 @@ git clone https://github.com/your-username/task-stream.git
 cd task-stream
 ```
 
+### 环境变量配置
+
+在开始之前，你需要配置环境变量：
+
+1. 在项目根目录下，复制示例环境文件：
+   ```bash
+   cp .env.example .env
+   ```
+2. 编辑 `.env` 文件，填入必要的配置：
+   - `OPENAI_API_KEY`: 填入你的通义千问或 OpenAI API Key。
+   - `VITE_API_BASE_URL`: 前端调用的后端 API 地址。如果在移动端测试，请设置为电脑的局域网 IP（如 `http://192.168.1.x:8000`）。
+
 ### 后端设置
 
 1. **创建虚拟环境**

@@ -12,8 +12,8 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
   const [dueDate, setDueDate] = useState('')
   const [result, setResult] = useState('')
   
-  // Subtask specific state
-  const [status, setStatus] = useState(1) // 1: Not Started, 2: In Progress, 3: Completed
+  // 子任务特定状态
+  const [status, setStatus] = useState(1) // 1: 未开始, 2: 进行中, 3: 已完成
   const [proportion, setProportion] = useState(1.0) // 子任务权重
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
       setResult(subtask.result || '')
       setStatus(subtask.status || 1)
 
-      // Get the proportion from the parent task's sub_task_ids
+      // 从父级任务的 sub_task_ids 获取权重
       const getProportion = async () => {
         if (parentTaskId) {
           try {
@@ -37,10 +37,10 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
             if (parentTask && parentTask.sub_task_ids && parentTask.sub_task_ids[subtask.id]) {
               const subtaskData = parentTask.sub_task_ids[subtask.id];
               if (typeof subtaskData === 'object' && subtaskData !== null) {
-                // New format: {weight: x, progress: y}
+                // 新格式: {weight: x, progress: y}
                 setProportion(subtaskData.weight || 1.0);
               } else {
-                // Old format: just the weight value
+                // 旧格式: 仅权重值
                 setProportion(subtaskData || 1.0);
               }
             } else {
@@ -75,10 +75,10 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
     if (!title) return alert('请输入任务标题')
     
     try {
-      // Get the current task data to preserve other fields
+      // 获取当前任务数据以保留其他字段
       const currentTask = await api.getTaskById(subtask.id);
       
-      // Update the task with new values
+      // 使用新值更新任务
       const updatedTask = {
         ...currentTask,
         title,
@@ -96,23 +96,23 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
       console.log('[SubtaskEditor] Saving subtask, long_term_task_id:', updatedTask.long_term_task_id);
       console.log('[SubtaskEditor] Full update data:', updatedTask);
       
-      // Update the task
+      // 更新任务
       await api.updateTask(subtask.id, updatedTask);
       
-      // Update the proportion in the parent long-term task
+      // 更新父级长期任务中的权重
       const parentTask = await api.getLongTermTaskById(parentTaskId);
       if (parentTask && parentTask.sub_task_ids) {
         const updatedSubTaskIds = { ...parentTask.sub_task_ids };
         
-        // Handle both old and new data formats
+        // 处理旧格式和新格式数据
         if (typeof updatedSubTaskIds[subtask.id] === 'object' && updatedSubTaskIds[subtask.id] !== null) {
-          // New format: {weight: x, progress: y}
+          // 新格式: {weight: x, progress: y}
           updatedSubTaskIds[subtask.id] = {
             ...updatedSubTaskIds[subtask.id],
             weight: proportion
           };
         } else {
-          // Old format: just the weight value
+          // 旧格式: 仅权重值
           updatedSubTaskIds[subtask.id] = proportion;
         }
         
@@ -139,7 +139,7 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="bg-card w-full max-w-2xl rounded-2xl shadow-2xl transform transition-all flex flex-col max-h-[90vh] border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
-        {/* Header */}
+        {/* 头部 */}
         <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-800 dark:text-white">
             编辑子任务
@@ -155,7 +155,7 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
         <div className="p-6 overflow-y-auto custom-scrollbar">
           <div className="space-y-6">
             
-            {/* Title Section */}
+            {/* 标题区域 */}
             <div>
               <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">任务标题</label>
               <input 
@@ -167,7 +167,7 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
               />
             </div>
 
-            {/* Time & Date Row */}
+            {/* 时间和日期行 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">执行日期</label>
@@ -198,7 +198,7 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
               </div>
             </div>
 
-            {/* Tags Section */}
+            {/* 标签区域 */}
             <div>
               <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">标签</label>
               <div className="relative">
@@ -213,7 +213,7 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
               </div>
             </div>
             
-            {/* Status, Record Result, Deadline Row */}
+            {/* 状态、记录成果、截止日期行 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">任务状态</label>
@@ -249,7 +249,7 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
               </div>
             </div>
 
-            {/* Weight Section (Subtask Specific) */}
+            {/* 权重区域 (子任务特定) */}
             <div>
               <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">任务权重</label>
               <div className="flex items-center gap-4">
@@ -268,7 +268,7 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
               </div>
             </div>
             
-            {/* Description Section */}
+            {/* 描述区域 */}
             <div>
               <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">任务描述</label>
               <textarea 
@@ -279,7 +279,7 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
               />
             </div>
 
-            {/* Result Description (Only for existing tasks) */}
+            {/* 成果总结 (仅针对现有任务) */}
             <div>
               <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">成果总结</label>
               <textarea 
@@ -292,7 +292,7 @@ export default function SubtaskEditor({ visible, onClose, onSave, subtask, paren
           </div>
         </div>
 
-        {/* Footer */}
+        {/* 底部 */}
         <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex gap-4">
           <button 
             onClick={onClose} 
